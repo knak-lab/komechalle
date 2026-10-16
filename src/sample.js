@@ -23,8 +23,8 @@ export function sampleData() {
     { id: 'ev1', kind: 'event', name: '田植え', date: '2026-05-17' },
     { id: 'ev2', kind: 'event', name: '稲刈り', date: '2026-09-27' },
   );
-  const add = (from, to, type, label = '', auto = false, pending = false) =>
-    edges.push({ id: 'e' + seq++, from, to, type, label, auto, pending });
+  const add = (from, to, type, label = '', auto = false) =>
+    edges.push({ id: 'e' + seq++, from, to, type, label, auto, pending: false });
   for (const m of M)
     for (const s of m[7]) {
       const sid = 'sk:' + s;
@@ -36,7 +36,7 @@ export function sampleData() {
   add('m2', 'm6', 'friend'); add('m5', 'm7', 'friend'); add('m6', 'm10', 'family', 'いとこ');
   add('m3', 'm9', 'neighbor'); add('m2', 'm10', 'other', '同じ高校');
   add('m2', 'm4', 'colleague', '同じ職場'); add('m7', 'm9', 'colleague', '農協の仕事');
-  add('m5', 'm8', 'friend', '', false, true);
+  add('m5', 'm8', 'friend');
   for (const m of ['m1', 'm3', 'm5', 'm7']) add(m, 'f1', 'work', '', true);
   for (const m of ['m2', 'm6', 'm9', 'm1']) add(m, 'f2', 'work', '', true);
   for (const m of ['m1', 'm2', 'm4', 'm5', 'm6', 'm8', 'm10']) add(m, 'ev1', 'event', '', true);

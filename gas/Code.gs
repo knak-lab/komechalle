@@ -96,10 +96,6 @@ const ACTIONS = {
     appendEdges_([req.edge]);
   },
 
-  approveEdge(req) {
-    updateRow_(sheet_('edges', EDGE_COLS), EDGE_COLS, req.id, { pending: 'false' });
-  },
-
   deleteEdge(req) {
     checkAdmin_(req);
     deleteRows_(sheet_('edges', EDGE_COLS), EDGE_COLS, (e) => e.id === req.id);
@@ -233,7 +229,7 @@ function appendEdges_(edges) {
     if (EDGE_TYPES.indexOf(e.type) < 0) throw new Error('不明なつながりの種類です: ' + e.type);
     appendObj_(sh, EDGE_COLS, {
       id: e.id, from: e.from, to: e.to, type: e.type, label: limit_(e.label, 20),
-      auto: !!e.auto, pending: !!e.pending, createdAt: now,
+      auto: !!e.auto, pending: false, createdAt: now, // 承認は使わないので pending は常に false
     });
   });
 }

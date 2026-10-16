@@ -5,9 +5,7 @@ const clampK = (k) => Math.max(0.3, Math.min(2.5, k));
 
 function edgeText(e) {
   const t = TYPES[e.type];
-  let s = e.type === 'other' ? e.label || 'その他' : t.name + (e.label ? '：' + e.label : '');
-  if (e.pending) s += '（承認待ち）';
-  return s;
+  return e.type === 'other' ? e.label || 'その他' : t.name + (e.label ? '：' + e.label : '');
 }
 
 function NodeShape({ n }) {
@@ -277,7 +275,6 @@ const MapView = forwardRef(function MapView(
                   <line
                     className="edge"
                     x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                    strokeDasharray={e.pending ? '2 6' : undefined}
                     style={{ stroke: col, strokeWidth: e.auto ? (touch ? 2.5 : 1.6) : touch ? 4 : 2.8, opacity: e.auto && !touch ? 0.6 : 1 }}
                   />
                   {TYPES[e.type].dir && (

@@ -131,12 +131,12 @@ export default function App() {
   const startConnect = (from = null) => { setMode('connect'); setConnectFrom(from); };
   const stopConnect = () => { setMode('view'); setConnectFrom(null); };
 
-  async function addEdge({ from, to, type, label = '', pending = false }, msg) {
+  async function addEdge({ from, to, type, label = '' }, msg) {
     const dup = dataRef.current.edges.some(
       (e) => e.type === type && ((e.from === from && e.to === to) || (e.from === to && e.to === from)),
     );
     if (dup) { toast('すでにつながっています'); return; }
-    const edge = { id: uid('e'), from, to, type, label, auto: false, pending };
+    const edge = { id: uid('e'), from, to, type, label, auto: false, pending: false };
     await mutate((d) => ({ ...d, edges: [...d.edges, edge] }), 'addEdge', { edge }, msg);
   }
 
@@ -164,11 +164,10 @@ export default function App() {
   }
 
   async function submitLink({ from, to, type, label }) {
-    const both = from.kind === 'member' && to.kind === 'member';
     setLinkPair(null);
     stopConnect();
     select(from.id);
-    await addEdge({ from: from.id, to: to.id, type, label, pending: both }, both ? `${to.name}さんに承認をお願いしました` : 'つなぎました');
+    await addEdge({ from: from.id, to: to.id, type, label }, `${from.name}と${to.name}をつなぎました`);
   }
 
   async function submitMember({ fields, photo, skillIds, newSkills, intro }) {
@@ -362,10 +361,6 @@ export default function App() {
           onClear={() => setSel(null)}
           onStartLink={(id) => startConnect(id)}
           onEdit={(id) => setMemberDlg({ id })}
-          onApprove={(id) => mutate(
-            (d) => ({ ...d, edges: d.edges.map((e) => (e.id === id ? { ...e, pending: false } : e)) }),
-            'approveEdge', { id }, 'つながりが確定しました',
-          )}
           onDeleteEdge={(id) => mutate(
             (d) => ({ ...d, edges: d.edges.filter((e) => e.id !== id) }),
             'deleteEdge', { id, adminKey }, 'つながりを消しました',

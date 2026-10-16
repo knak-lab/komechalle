@@ -20,7 +20,6 @@ export function LinkDialog({ pair, onSubmit, onClose }) {
   const [type, setType] = useState('friend');
   const [label, setLabel] = useState('');
   const t = TYPES[type];
-  const both = pair.a.kind === 'member' && pair.b.kind === 'member';
   return (
     <Overlay onClose={onClose}>
       <form className="dialog" onSubmit={(e) => { e.preventDefault(); onSubmit({ from: ab.a, to: ab.b, type, label: label.trim() }); }}>
@@ -49,7 +48,6 @@ export function LinkDialog({ pair, onSubmit, onClose }) {
           <label htmlFor="link-label">ひとこと（任意）</label>
           <input type="text" id="link-label" maxLength={20} value={label} onChange={(e) => setLabel(e.target.value)} placeholder="例：コンバインの操作、同じ高校" />
         </div>
-        {both && <p className="note">人と人のつながりは、相手が「承認」すると確定します。</p>}
         <div className="dfoot">
           <button type="button" className="btn" onClick={onClose}>キャンセル</button>
           <button type="submit" className="btn primary">つなぐ</button>

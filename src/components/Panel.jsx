@@ -12,7 +12,7 @@ export function Avatar({ n, size }) {
 
 const ORDER = Object.fromEntries(Object.keys(TYPES).map((k, i) => [k, i]));
 
-function ConnRow({ e, me, byId, isAdmin, onGoto, onApprove, onDelete }) {
+function ConnRow({ e, me, byId, isAdmin, onGoto, onDelete }) {
   const meNode = byId.get(me);
   const o = byId.get(e.from === me ? e.to : e.from);
   if (!o) return null;
@@ -33,12 +33,6 @@ function ConnRow({ e, me, byId, isAdmin, onGoto, onApprove, onDelete }) {
     <li>
       <span className={'dot' + (e.auto ? ' auto' : '')} style={{ background: `var(${TYPES[e.type].c})` }} />
       <span className="ctext">{txt}{sub && <span className="sub">{sub}</span>}</span>
-      {e.pending && (
-        <>
-          <span className="pending">承認待ち</span>
-          <button className="btn small" onClick={() => onApprove(e.id)}>承認</button>
-        </>
-      )}
       {isAdmin && (
         <button className="x" onClick={() => onDelete(e.id)} aria-label="このつながりを消す">×</button>
       )}
@@ -49,8 +43,8 @@ function ConnRow({ e, me, byId, isAdmin, onGoto, onApprove, onDelete }) {
 function Overview({ nodes, edges, byId, onGoto }) {
   const members = nodes.filter((n) => n.kind === 'member');
   const isMember = (id) => byId.get(id)?.kind === 'member';
-  const mm = edges.filter((e) => !e.auto && !e.pending && isMember(e.from) && isMember(e.to)).length;
-  const pend = edges.filter((e) => e.pending).length;
+  const mm = edges.filter((e) => !e.auto && isMember(e.from) && isMember(e.to)).length;
+  const places = nodes.filter((n) => n.kind === 'field' || n.kind === 'event').length;
   const deg = members
     .map((m) => [m, edges.filter((e) => (e.from === m.id || e.to === m.id) && e.type !== 'skill').length])
     .sort((a, b) => b[1] - a[1])
@@ -61,7 +55,7 @@ function Overview({ nodes, edges, byId, onGoto }) {
       <div className="stats">
         <div className="stat"><b>{members.length}</b><span>メンバー</span></div>
         <div className="stat"><b>{mm}</b><span>人と人の線</span></div>
-        <div className="stat"><b>{pend}</b><span>承認待ち</span></div>
+        <div className="stat"><b>{places}</b><span>田んぼ・イベント</span></div>
       </div>
       {deg.length > 0 && (
         <>
@@ -88,7 +82,7 @@ function Overview({ nodes, edges, byId, onGoto }) {
   );
 }
 
-export default function Panel({ nodes, edges, sel, isAdmin, onGoto, onClear, onApprove, onDeleteEdge, onStartLink, onEdit, onDeleteNode }) {
+export default function Panel({ nodes, edges, sel, isAdmin, onGoto, onClear, onDeleteEdge, onStartLink, onEdit, onDeleteNode }) {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const n = sel && byId.get(sel);
   if (!n) return <aside className="panel"><Overview nodes={nodes} edges={edges} byId={byId} onGoto={onGoto} /></aside>;
@@ -96,8 +90,8 @@ export default function Panel({ nodes, edges, sel, isAdmin, onGoto, onClear, onA
   const mine = edges.filter((e) => e.from === n.id || e.to === n.id);
   const rows = mine
     .filter((e) => n.kind !== 'member' || e.type !== 'skill')
-    .sort((a, b) => a.pending - b.pending || ORDER[a.type] - ORDER[b.type]);
-  const rowProps = { me: n.id, byId, isAdmin, onGoto, onApprove, onDelete: onDeleteEdge };
+    .sort((a, b) => ORDER[a.type] - ORDER[b.type]);
+  const rowProps = { me: n.id, byId, isAdmin, onGoto, onDelete: onDeleteEdge };
   const adminDelete = isAdmin && (
     <ConfirmButton className="btn small danger" confirmText="もう一度押すと削除します" onConfirm={() => onDeleteNode(n.id)}>
       {n.kind === 'member' ? 'このメンバーを削除' : '削除'}
