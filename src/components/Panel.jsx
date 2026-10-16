@@ -12,7 +12,7 @@ export function Avatar({ n, size }) {
 
 const ORDER = Object.fromEntries(Object.keys(TYPES).map((k, i) => [k, i]));
 
-function ConnRow({ e, me, byId, isAdmin, onGoto, onDelete }) {
+function ConnRow({ e, me, byId, onGoto, onDelete }) {
   const meNode = byId.get(me);
   const o = byId.get(e.from === me ? e.to : e.from);
   if (!o) return null;
@@ -33,9 +33,7 @@ function ConnRow({ e, me, byId, isAdmin, onGoto, onDelete }) {
     <li>
       <span className={'dot' + (e.auto ? ' auto' : '')} style={{ background: `var(${TYPES[e.type].c})` }} />
       <span className="ctext">{txt}{sub && <span className="sub">{sub}</span>}</span>
-      {isAdmin && (
-        <button className="x" onClick={() => onDelete(e.id)} aria-label="このつながりを消す">×</button>
-      )}
+      <button className="x" onClick={() => onDelete(e.id)} aria-label="このつながりを消す" title="このつながりを消す">×</button>
     </li>
   );
 }
@@ -91,7 +89,7 @@ export default function Panel({ nodes, edges, sel, isAdmin, onGoto, onClear, onD
   const rows = mine
     .filter((e) => n.kind !== 'member' || e.type !== 'skill')
     .sort((a, b) => ORDER[a.type] - ORDER[b.type]);
-  const rowProps = { me: n.id, byId, isAdmin, onGoto, onDelete: onDeleteEdge };
+  const rowProps = { me: n.id, byId, onGoto, onDelete: onDeleteEdge };
   const adminDelete = isAdmin && (
     <ConfirmButton className="btn small danger" confirmText="もう一度押すと削除します" onConfirm={() => onDeleteNode(n.id)}>
       {n.kind === 'member' ? 'このメンバーを削除' : '削除'}

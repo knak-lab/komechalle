@@ -7,7 +7,7 @@
  *   log   : 変更履歴
  *
  * スクリプトプロパティ
- *   ADMIN_KEY : 運営モードの合言葉（削除するときに必要）
+ *   ADMIN_KEY : 運営モードの合言葉（メンバーや田んぼ・イベントを削除するときに必要）
  */
 
 // 顔写真を保存する Google ドライブのフォルダ（カモの小屋アカウント）
@@ -96,8 +96,8 @@ const ACTIONS = {
     appendEdges_([req.edge]);
   },
 
+  // 線はだれでも消せる（気軽に使えることを優先。消しすぎてもまたつなげばいい）
   deleteEdge(req) {
-    checkAdmin_(req);
     deleteRows_(sheet_('edges', EDGE_COLS), EDGE_COLS, (e) => e.id === req.id);
   },
 

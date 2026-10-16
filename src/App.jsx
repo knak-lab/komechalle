@@ -363,7 +363,7 @@ export default function App() {
           onEdit={(id) => setMemberDlg({ id })}
           onDeleteEdge={(id) => mutate(
             (d) => ({ ...d, edges: d.edges.filter((e) => e.id !== id) }),
-            'deleteEdge', { id, adminKey }, 'つながりを消しました',
+            'deleteEdge', { id }, 'つながりを消しました',
           )}
           onDeleteNode={(id) => {
             setSel(null);
