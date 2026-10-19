@@ -83,7 +83,7 @@ function Overview({ nodes, edges, byId, onGoto }) {
 export default function Panel({ nodes, edges, sel, isAdmin, onGoto, onClear, onDeleteEdge, onStartLink, onEdit, onDeleteNode }) {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const n = sel && byId.get(sel);
-  if (!n) return <aside className="panel"><Overview nodes={nodes} edges={edges} byId={byId} onGoto={onGoto} /></aside>;
+  if (!n) return <aside className="panel overview"><Overview nodes={nodes} edges={edges} byId={byId} onGoto={onGoto} /></aside>;
 
   const mine = edges.filter((e) => e.from === n.id || e.to === n.id);
   const rows = mine

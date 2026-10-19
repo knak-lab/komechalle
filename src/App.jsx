@@ -52,6 +52,8 @@ export default function App() {
     try { return sessionStorage.getItem(ADMIN_STORE) || ''; } catch { return ''; }
   });
   const [toastMsg, setToastMsg] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false); // スマホ：上のメニュー
+  const [fabOpen, setFabOpen] = useState(false); // スマホ：＋ボタンの選択肢
   const mapRef = useRef(null);
   const [fitKey, setFitKey] = useState(0);
   const [focus, setFocus] = useState(null);
@@ -159,6 +161,8 @@ export default function App() {
   }
 
   function onTapBackground() {
+    setFabOpen(false);
+    setMenuOpen(false);
     if (mode === 'connect') setConnectFrom(null);
     else setSel(null);
   }
@@ -273,14 +277,14 @@ export default function App() {
     const hit =
       data.nodes.find((n) => (n.kind !== 'skill' || typesOn.skill) && n.name.includes(q)) ||
       members.find((m) => data.edges.some((e) => e.from === m.id && e.type === 'skill' && byId.get(e.to)?.name.includes(q)));
-    if (hit) select(hit.id, true);
+    if (hit) { select(hit.id, true); setMenuOpen(false); }
     else toast(`「${q}」は見つかりませんでした`);
   }
 
   const editing = memberDlg?.id && byId.get(memberDlg.id);
 
   return (
-    <div className={'app' + (mode === 'connect' ? ' connecting' : '')}>
+    <div className={'app' + (mode === 'connect' ? ' connecting' : '') + (menuOpen ? ' menu-open' : '')}>
       <header className="bar">
         <div className="brand">
           <h1><em>米チャレ！</em>つながりマップ</h1>
@@ -295,9 +299,9 @@ export default function App() {
           />
         </div>
         <div className="tools">
-          <button className="btn primary" onClick={() => setMemberDlg({})} disabled={status !== 'ready'}>＋ メンバー登録</button>
+          <button className="btn primary in-fab" onClick={() => setMemberDlg({})} disabled={status !== 'ready'}>＋ メンバー登録</button>
           <button
-            className="btn" aria-pressed={mode === 'connect'} disabled={status !== 'ready'}
+            className="btn in-fab" aria-pressed={mode === 'connect'} disabled={status !== 'ready'}
             onClick={() => (mode === 'connect' ? stopConnect() : startConnect(sel && byId.get(sel)?.kind === 'member' ? sel : null))}
           >線をつなぐ</button>
           <ConfirmButton className="btn" confirmText="配置がみんな分変わります。もう一度押す" onConfirm={autoLayout}>自動で並べる</ConfirmButton>
@@ -309,6 +313,7 @@ export default function App() {
               サンプルに戻す
             </ConfirmButton>
           )}
+          <button className="btn menu-close" onClick={() => setMenuOpen(false)}>閉じる</button>
         </div>
       </header>
 
@@ -343,6 +348,20 @@ export default function App() {
             <div className="state">
               <p>データを読み込めませんでした。<br /><small>{errMsg}</small></p>
               <button className="btn" onClick={() => { setStatus('loading'); load(true); }}>もう一度読み込む</button>
+            </div>
+          )}
+          <button className="menu-btn" aria-label="メニュー" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+          </button>
+          {status === 'ready' && mode !== 'connect' && (
+            <div className={'fab-wrap' + (sel ? ' has-sel' : '')}>
+              {fabOpen && (
+                <div className="fab-menu">
+                  <button onClick={() => { setFabOpen(false); setMemberDlg({}); }}>メンバーを登録</button>
+                  <button onClick={() => { setFabOpen(false); startConnect(); }}>線をつなぐ</button>
+                </div>
+              )}
+              <button className="fab" aria-label="追加" aria-expanded={fabOpen} onClick={() => setFabOpen((o) => !o)}>＋</button>
             </div>
           )}
           {mode === 'connect' && (
