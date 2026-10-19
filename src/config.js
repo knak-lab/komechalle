@@ -8,7 +8,7 @@ export const TYPES = {
   intro: { name: '紹介', c: '--e-intro', manual: true, dir: ['紹介した人', '紹介された人'], icon: 'M4 12h14M13 6l6 6-6 6' },
   work: { name: '一緒に作業', c: '--e-work', icon: 'M12 21v-9M12 12c0-4-3-6-7-6 0 4 3 6 7 6zM12 10c0-3 2-5 6-5 0 3-2 5-6 5' },
   event: { name: 'イベント', c: '--e-event', icon: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4' },
-  mentor: { name: '師匠・弟子', c: '--e-mentor', manual: true, dir: ['教える人', '教わる人'], icon: 'M3 5h6a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H3zM21 5h-6a3 3 0 0 0-3 3v12a2 2 0 0 1 2-2h7z' },
+  mentor: { name: '師匠・弟子', c: '--e-mentor', manual: true, on: true, dir: ['教える人', '教わる人'], icon: 'M3 5h6a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H3zM21 5h-6a3 3 0 0 0-3 3v12a2 2 0 0 1 2-2h7z' },
   other: { name: 'その他', c: '--e-other', manual: true, icon: 'M3 12V4h8l10 10-8 8zM7.5 7.5h.01' },
   skill: { name: '得意なこと', c: '--e-skill', icon: 'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z' },
 };
