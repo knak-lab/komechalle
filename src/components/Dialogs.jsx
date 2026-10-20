@@ -183,7 +183,7 @@ export function AdminDialog({ onSubmit, onClose }) {
     <Overlay onClose={onClose}>
       <form className="dialog" onSubmit={async (e) => { e.preventDefault(); if (!key || busy) return; setBusy(true); await onSubmit(key); setBusy(false); }}>
         <h2>運営モード</h2>
-        <p className="lead">運営用の合言葉を入れると、メンバーや田んぼ・イベントを削除できるようになります。</p>
+        <p className="lead">運営用の合言葉を入れると、カレンダーの予定を追加・編集したり、メンバーや田んぼ・イベントを削除したりできるようになります。</p>
         <div className="field">
           <label htmlFor="admin-key">合言葉</label>
           <input type="password" id="admin-key" autoFocus value={key} onChange={(e) => setKey(e.target.value)} />

@@ -13,12 +13,14 @@
 // 顔写真を保存する Google ドライブのフォルダ（カモの小屋アカウント）
 const FOLDER_ID = '1dMlnsiI8zkapdRYEUCwFTC87Cq2SZwSJ';
 
-const NODE_COLS = ['id', 'kind', 'name', 'area', 'exp', 'word', 'join', 'role', 'photo', 'size', 'variety', 'date', 'x', 'y', 'updatedAt'];
+// 列は後ろに足していく（既存のシートには sheet_() が見出しを足す）
+const NODE_COLS = ['id', 'kind', 'name', 'area', 'exp', 'word', 'join', 'role', 'photo', 'size', 'variety', 'date', 'x', 'y', 'updatedAt', 'time', 'place', 'note'];
 const EDGE_COLS = ['id', 'from', 'to', 'type', 'label', 'auto', 'pending', 'createdAt'];
 const LOG_COLS = ['at', 'action', 'target', 'detail'];
 
 const EDGE_TYPES = ['family', 'partner', 'friend', 'colleague', 'neighbor', 'intro', 'work', 'event', 'mentor', 'other', 'skill'];
 const MEMBER_FIELDS = ['name', 'area', 'exp', 'word', 'join', 'role'];
+const EVENT_FIELDS = ['name', 'date', 'time', 'place', 'note'];
 
 /* ---------- 入口 ---------- */
 
@@ -92,6 +94,25 @@ const ACTIONS = {
     return { photo };
   },
 
+  // カレンダーの予定（イベント）。追加と編集は運営だけ。削除は deleteNode
+  addEvent(req) {
+    checkAdmin_(req);
+    const node = cleanNode_(Object.assign({}, req.node, { kind: 'event' }));
+    if (!node.name || !/^\d{4}-\d{2}-\d{2}$/.test(node.date)) throw new Error('名前と日付が必要です');
+    const sh = sheet_('nodes', NODE_COLS);
+    if (findRow_(sh, node.id)) throw new Error('すでにある予定です');
+    appendObj_(sh, NODE_COLS, node);
+  },
+
+  updateEvent(req) {
+    checkAdmin_(req);
+    const patch = {};
+    EVENT_FIELDS.forEach((k) => { if (req.patch && k in req.patch) patch[k] = limit_(req.patch[k]); });
+    if ('date' in patch && !/^\d{4}-\d{2}-\d{2}$/.test(patch.date)) throw new Error('日付が正しくありません');
+    patch.updatedAt = new Date().toISOString();
+    updateRow_(sheet_('nodes', NODE_COLS), NODE_COLS, req.id, patch);
+  },
+
   addEdge(req) {
     appendEdges_([req.edge]);
   },
@@ -160,6 +181,14 @@ function sheet_(name, cols) {
     sh.getRange(1, 1, sh.getMaxRows(), cols.length).setNumberFormat('@');
     sh.getRange(1, 1, 1, cols.length).setValues([cols]).setFontWeight('bold');
     sh.setFrozenRows(1);
+  }
+  // あとから足した列の見出しを足す
+  const width = sh.getLastColumn();
+  const head = width ? sh.getRange(1, 1, 1, width).getValues()[0].map(String) : [];
+  if (head.length < cols.length && cols.slice(0, head.length).every((c, i) => c === head[i])) {
+    const add = cols.slice(head.length);
+    sh.getRange(1, head.length + 1, sh.getMaxRows(), add.length).setNumberFormat('@');
+    sh.getRange(1, head.length + 1, 1, add.length).setValues([add]).setFontWeight('bold');
   }
   return sh;
 }

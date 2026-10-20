@@ -5,6 +5,7 @@ import { placeMissing, runForce } from './layout';
 import MapView from './components/MapView';
 import Panel from './components/Panel';
 import { AdminDialog, ConfirmButton, LinkDialog, MemberDialog } from './components/Dialogs';
+import CalendarDialog from './components/Calendar';
 
 const ADMIN_STORE = 'komechalle-admin';
 const round = (n) => ({ ...n, x: Math.round(n.x), y: Math.round(n.y) });
@@ -48,6 +49,7 @@ export default function App() {
   const [linkPair, setLinkPair] = useState(null);
   const [memberDlg, setMemberDlg] = useState(null); // { id } で編集、{} で新規登録
   const [adminOpen, setAdminOpen] = useState(false);
+  const [calOpen, setCalOpen] = useState(false);
   const [adminKey, setAdminKey] = useState(() => {
     try { return sessionStorage.getItem(ADMIN_STORE) || ''; } catch { return ''; }
   });
@@ -224,6 +226,21 @@ export default function App() {
     select(id, true);
   }
 
+  // カレンダーの予定（= マップのイベント）。保存できたら id を返す
+  async function saveEvent(id, fields) {
+    if (id) {
+      const res = await mutate(
+        (d) => ({ ...d, nodes: d.nodes.map((n) => (n.id === id ? { ...n, ...fields } : n)) }),
+        'updateEvent', { id, patch: fields, adminKey }, '予定を保存しました',
+      );
+      return res && id;
+    }
+    const c = mapRef.current.center();
+    const node = round({ id: uid('ev'), kind: 'event', ...fields, x: c.x + 60, y: c.y + 40 });
+    const res = await mutate((d) => ({ ...d, nodes: [...d.nodes, node] }), 'addEvent', { node, adminKey }, '予定を追加しました');
+    return res && node.id;
+  }
+
   async function submitAdmin(key) {
     try {
       if (!isDemo) await call('checkAdmin', { adminKey: key });
@@ -304,6 +321,7 @@ export default function App() {
             className="btn in-fab" aria-pressed={mode === 'connect'} disabled={status !== 'ready'}
             onClick={() => (mode === 'connect' ? stopConnect() : startConnect(sel && byId.get(sel)?.kind === 'member' ? sel : null))}
           >線をつなぐ</button>
+          <button className="btn" onClick={() => { setCalOpen(true); setMenuOpen(false); }} disabled={status !== 'ready'}>カレンダー</button>
           <ConfirmButton className="btn" confirmText="配置がみんな分変わります。もう一度押す" onConfirm={autoLayout}>自動で並べる</ConfirmButton>
           {adminKey
             ? <button className="btn" onClick={exitAdmin}>運営モードを終わる</button>
@@ -406,6 +424,25 @@ export default function App() {
           onSubmit={submitMember}
           onClose={() => setMemberDlg(null)}
           onError={toast}
+        />
+      )}
+      {calOpen && (
+        <CalendarDialog
+          nodes={data.nodes}
+          edges={data.edges}
+          isAdmin={!!adminKey}
+          onClose={() => setCalOpen(false)}
+          onSaveEvent={saveEvent}
+          onDeleteEvent={(id) => mutate(
+            (d) => ({ nodes: d.nodes.filter((n) => n.id !== id), edges: d.edges.filter((e) => e.from !== id && e.to !== id) }),
+            'deleteNode', { id, adminKey }, '予定を削除しました',
+          )}
+          onJoin={(mid, ev) => addEdge({ from: mid, to: ev.id, type: 'event' }, `${byId.get(mid)?.name}さんが${ev.name}に参加します`)}
+          onLeave={(id) => mutate(
+            (d) => ({ ...d, edges: d.edges.filter((e) => e.id !== id) }),
+            'deleteEdge', { id }, '参加を取り消しました',
+          )}
+          onGoto={(id) => { setCalOpen(false); select(id, true); }}
         />
       )}
       {adminOpen && <AdminDialog onSubmit={submitAdmin} onClose={() => setAdminOpen(false)} />}

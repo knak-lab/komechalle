@@ -139,7 +139,7 @@ export default function Panel({ nodes, edges, sel, isAdmin, onGoto, onClear, onD
       <h2>{n.kind === 'skill' && '#'}{n.name}</h2>
       <p className="meta">
         {n.kind === 'field' && `田んぼ・${n.size || ''}・${n.variety || ''}`}
-        {n.kind === 'event' && `イベント・${ymd(n.date)}`}
+        {n.kind === 'event' && ['イベント', ymd(n.date), n.time, n.place].filter(Boolean).join('・')}
         {n.kind === 'skill' && '得意なこと'}
       </p>
       <h3>{lab} {people.length}人</h3>
