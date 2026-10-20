@@ -43,3 +43,50 @@ export function sampleData() {
   for (const m of ['m1', 'm3', 'm7', 'm9', 'm4']) add(m, 'ev2', 'event', '', true);
   return { nodes, edges };
 }
+
+// 収支のサンプル（実装依頼 C章の 2026年度の値）。デモモードとテストで使う
+export function sampleFinance() {
+  const mat = (...xs) => JSON.stringify(xs.map(([label, amount]) => ({ label, amount })));
+  const P = (id, name, channel, price, extra) => ({
+    id, name, channel, price, cookedG: '', riceRawG: '', materials: '[]', shipping: 0, customerPaysShipping: false,
+    feeRate: 0, feeFixed: 0, kamoProductId: '', active: true, ...extra,
+  });
+  return {
+    harvest: [
+      { year: 2026, harvestDate: '2026-09-20', fieldIds: 'f1', areaTan: 1, momiKg: '', genmaiBags: 13, bagKg: 30, genmaiKg: '', seimaiRate: 0.9, hakumaiKg: '', memo: '' },
+    ],
+    costs: [
+      { id: 'c1', year: 2026, category: '種', label: '種米2kg', unitPrice: '', qty: '', amount: 20000 },
+      { id: 'c2', year: 2026, category: '燃料', label: 'ガソリン代', unitPrice: '', qty: '', amount: 30000 },
+      { id: 'c3', year: 2026, category: '農薬', label: '農薬代', unitPrice: '', qty: '', amount: 50000 },
+      { id: 'c4', year: 2026, category: 'もみすり', label: 'もみすり代', unitPrice: 1500, qty: 13, amount: '' },
+    ],
+    assets: [{ id: 'a1', label: 'トラクター', price: 200000, startYear: 2026, years: 5 }],
+    products: [
+      P('p1', '焼きおにぎり（醤油）', 'event', 350, { cookedG: 80, materials: mat(['カップ', 20], ['醤油', 3]) }),
+      P('p2', '焼きおにぎり（味噌）', 'event', 350, { cookedG: 80, materials: mat(['カップ', 20], ['味噌', 6]) }),
+      P('p3', 'おにぎり', 'store', 250, { cookedG: 80, materials: mat(['包装・海苔・具', 30]) }),
+      P('p4', 'お米450g', 'store', 1000, { riceRawG: 450, materials: mat(['袋', 30]) }),
+      P('p5', 'お米450g（ネット・送料別）', 'online', 1000, { riceRawG: 450, materials: mat(['袋', 30]), shipping: 240, customerPaysShipping: true, feeRate: 0.066, feeFixed: 40 }),
+      P('p6', 'お米450g（ネット・送料込み）', 'online', 1000, { riceRawG: 450, materials: mat(['袋', 30]), shipping: 240, customerPaysShipping: false, feeRate: 0.066, feeFixed: 40 }),
+    ],
+    sales: [],
+    settings: { cookRatio: 2.2, kamoLastSyncAt: '' },
+    kamoProducts: [],
+  };
+}
+
+// デモの「カモの小屋から取り込む」で返す架空の商品と売上
+export function sampleKamoExport() {
+  return {
+    products: [
+      { id: '米チャレ焼きおにぎり', name: '米チャレ焼きおにぎり', price: 350, category: 'イベント', active: true },
+      { id: '米チャレのお米450g', name: '米チャレのお米450g', price: 1000, category: '', active: true },
+    ],
+    sales: [
+      { id: 'sq1', date: '2026-10-04', productId: '米チャレのお米450g', qty: 3, amount: 3000, channel: 'Square' },
+      { id: 'sq2', date: '2026-10-11', productId: '米チャレ焼きおにぎり', qty: 42, amount: 14700, channel: 'Square' },
+      { id: 'sq3', date: '2026-10-12', productId: '米チャレのお米450g', qty: 2, amount: 2000, channel: 'BASE' },
+    ],
+  };
+}

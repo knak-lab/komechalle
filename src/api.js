@@ -51,3 +51,42 @@ export async function call(action, payload = {}) {
   if (!json.ok) throw new Error(json.error || '保存に失敗しました');
   return json;
 }
+
+/* ---------- 収支（運営モードだけ。公開の ?action=all には含めない） ---------- */
+
+const FIN_DEMO_KEY = 'komechalle-fin-demo-v1';
+
+// デモモードでは、ブラウザの中だけで GAS と同じように動かす
+export async function finCall(action, payload = {}) {
+  if (!isDemo) return call(action, payload);
+  const { sampleFinance, sampleKamoExport } = await import('./sample');
+  const { applyDelete, applyLink, applySave } = await import('./finance/store');
+  let fin;
+  try { fin = JSON.parse(localStorage.getItem(FIN_DEMO_KEY)); } catch { /* 壊れていたらサンプルから */ }
+  if (!fin || !Array.isArray(fin.products)) fin = sampleFinance();
+  let res = {};
+  if (action === 'finSave') fin = applySave(fin, payload.table, payload.row);
+  else if (action === 'finDelete') fin = applyDelete(fin, payload.table, payload.id);
+  else if (action === 'finLinkKamo') fin = applyLink(fin, payload.kamoProductId, payload.productId);
+  else if (action === 'syncFromKamo') {
+    const x = sampleKamoExport();
+    const have = new Set(fin.sales.map((s) => s.id));
+    const added = x.sales.filter((s) => !have.has('kamo:' + s.id)).map((s) => {
+      const p = fin.products.find((q) => q.kamoProductId && q.kamoProductId === s.productId);
+      return {
+        id: 'kamo:' + s.id, source: 'kamo', date: s.date, year: '', productId: p ? p.id : '', eventId: '', qty: s.qty,
+        unitPrice: s.amount / s.qty, amount: s.amount, variableCostAtSale: '', riceGAtSale: '',
+        channel: s.channel === 'BASE' ? 'online' : 'store', kamoProductId: s.productId, yearManual: '',
+      };
+    });
+    const now = new Date().toISOString();
+    fin = { ...fin, kamoProducts: x.products.map((p) => ({ ...p, syncedAt: now })), sales: [...fin.sales, ...added], settings: { ...fin.settings, kamoLastSyncAt: now } };
+    res = { added: added.length, unlinked: added.filter((s) => !s.productId).length };
+  }
+  try { localStorage.setItem(FIN_DEMO_KEY, JSON.stringify(fin)); } catch { /* noop */ }
+  return action === 'finance' ? { ok: true, fin } : { ok: true, ...res };
+}
+
+export function resetFinDemo() {
+  try { localStorage.removeItem(FIN_DEMO_KEY); } catch { /* noop */ }
+}

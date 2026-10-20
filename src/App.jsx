@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { TYPES, TYPE_SEPARATOR_BEFORE, initialTypesOn, skillId, uid } from './config';
-import { call, fetchAll, isDemo, resetDemo, saveDemo } from './api';
+import { call, fetchAll, isDemo, resetDemo, resetFinDemo, saveDemo } from './api';
 import { placeMissing, runForce } from './layout';
 import MapView from './components/MapView';
 import Panel from './components/Panel';
 import { AdminDialog, ConfirmButton, LinkDialog, MemberDialog } from './components/Dialogs';
 import CalendarDialog from './components/Calendar';
+import FinanceDialog from './finance/Finance';
 
 const ADMIN_STORE = 'komechalle-admin';
 const round = (n) => ({ ...n, x: Math.round(n.x), y: Math.round(n.y) });
@@ -50,6 +51,7 @@ export default function App() {
   const [memberDlg, setMemberDlg] = useState(null); // { id } で編集、{} で新規登録
   const [adminOpen, setAdminOpen] = useState(false);
   const [calOpen, setCalOpen] = useState(false);
+  const [finOpen, setFinOpen] = useState(false);
   const [adminKey, setAdminKey] = useState(() => {
     try { return sessionStorage.getItem(ADMIN_STORE) || ''; } catch { return ''; }
   });
@@ -322,12 +324,13 @@ export default function App() {
             onClick={() => (mode === 'connect' ? stopConnect() : startConnect(sel && byId.get(sel)?.kind === 'member' ? sel : null))}
           >線をつなぐ</button>
           <button className="btn" onClick={() => { setCalOpen(true); setMenuOpen(false); }} disabled={status !== 'ready'}>カレンダー</button>
+          {adminKey && <button className="btn" onClick={() => { setFinOpen(true); setMenuOpen(false); }} disabled={status !== 'ready'}>収支</button>}
           <ConfirmButton className="btn" confirmText="配置がみんな分変わります。もう一度押す" onConfirm={autoLayout}>自動で並べる</ConfirmButton>
           {adminKey
             ? <button className="btn" onClick={exitAdmin}>運営モードを終わる</button>
             : <button className="btn" onClick={() => setAdminOpen(true)}>運営</button>}
           {isDemo && (
-            <ConfirmButton className="btn danger" confirmText="もう一度押すと戻ります" onConfirm={() => { resetDemo(); setSel(null); load(true); }}>
+            <ConfirmButton className="btn danger" confirmText="もう一度押すと戻ります" onConfirm={() => { resetDemo(); resetFinDemo(); setSel(null); load(true); }}>
               サンプルに戻す
             </ConfirmButton>
           )}
@@ -451,6 +454,9 @@ export default function App() {
           )}
           onGoto={(id) => { setCalOpen(false); select(id, true); }}
         />
+      )}
+      {finOpen && adminKey && (
+        <FinanceDialog adminKey={adminKey} nodes={data.nodes} onClose={() => setFinOpen(false)} toast={toast} />
       )}
       {adminOpen && <AdminDialog onSubmit={submitAdmin} onClose={() => setAdminOpen(false)} />}
       {toastMsg && <div className="toast" role="status">{toastMsg}</div>}

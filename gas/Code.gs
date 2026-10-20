@@ -8,6 +8,8 @@
  *
  * スクリプトプロパティ
  *   ADMIN_KEY : 運営モードの合言葉（メンバーや田んぼ・イベントを削除するときに必要）
+ *
+ * 収支管理（fin_* シート、カモの小屋からの取り込み）は Finance.gs
  */
 
 // 顔写真を保存する Google ドライブのフォルダ（カモの小屋アカウント）
@@ -32,12 +34,12 @@ function doPost(e) {
   const lock = LockService.getScriptLock();
   try {
     const req = JSON.parse(e.postData.contents);
-    const fn = ACTIONS[req.action];
+    const fn = ACTIONS[req.action] || FIN_ACTIONS[req.action]; // FIN_ACTIONS は Finance.gs
     if (!fn) throw new Error('不明な操作です: ' + req.action);
     lock.waitLock(20000);
     const result = fn(req) || {};
-    // 配置の保存と合言葉の確認は回数が多いので履歴に残さない
-    if (req.action !== 'savePositions' && req.action !== 'checkAdmin') log_(req);
+    // 配置の保存・合言葉の確認・収支の読み込みは履歴に残さない
+    if (['savePositions', 'checkAdmin', 'finance'].indexOf(req.action) < 0) log_(req);
     return json_(Object.assign({ ok: true }, result));
   } catch (err) {
     return json_({ ok: false, error: String((err && err.message) || err) });
