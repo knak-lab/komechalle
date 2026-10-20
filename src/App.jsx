@@ -437,7 +437,14 @@ export default function App() {
             (d) => ({ nodes: d.nodes.filter((n) => n.id !== id), edges: d.edges.filter((e) => e.from !== id && e.to !== id) }),
             'deleteNode', { id, adminKey }, '予定を削除しました',
           )}
-          onJoin={(mid, ev) => addEdge({ from: mid, to: ev.id, type: 'event' }, `${byId.get(mid)?.name}さんが${ev.name}に参加します`)}
+          onJoin={(mids, ev) => {
+            const edges = mids
+              .filter((mid) => !dataRef.current.edges.some((e) => e.type === 'event' && ((e.from === mid && e.to === ev.id) || (e.from === ev.id && e.to === mid))))
+              .map((mid) => ({ id: uid('e'), from: mid, to: ev.id, type: 'event', label: '', auto: false, pending: false }));
+            if (!edges.length) return null;
+            const who = edges.length === 1 ? `${byId.get(edges[0].from)?.name}さん` : `${edges.length}人`;
+            return mutate((d) => ({ ...d, edges: [...d.edges, ...edges] }), 'addEdges', { edges }, `${who}が${ev.name}に参加します`);
+          }}
           onLeave={(id) => mutate(
             (d) => ({ ...d, edges: d.edges.filter((e) => e.id !== id) }),
             'deleteEdge', { id }, '参加を取り消しました',

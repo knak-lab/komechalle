@@ -246,11 +246,16 @@ ul.cal-list .c{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nu
 .cal-meta{margin:2px 0 0;color:var(--muted);font-size:13px}
 .person.joined{position:relative}
 .person.joined .x{position:absolute;top:-6px;right:-2px;background:var(--surface);border:1px solid var(--line);border-radius:50%;width:24px;height:24px;padding:0;font-size:14px}
-.cal-join{display:flex;gap:8px;margin-top:14px}
-.cal-join select{flex:1;min-width:0;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.cal-join{margin-top:4px}
+.pick{display:flex;flex-wrap:wrap;gap:6px;max-height:40vh;overflow:auto;padding:2px}
+.pick label{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--bg);border-radius:99px;padding:3px 12px 3px 3px;font-size:14px;cursor:pointer;user-select:none}
+.pick label.on{border-color:var(--accent);background:var(--accent-soft);font-weight:700}
+.pick input{position:absolute;opacity:0;pointer-events:none}
+.pick label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+.pick-foot{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:10px;position:sticky;bottom:0;background:var(--surface);padding-block:6px}
 @media (max-width:760px){
   .overlay:has(.dialog.cal){padding:0;place-items:stretch}
   .dialog.cal{width:100%;max-height:none;height:100%;border-radius:0;padding:calc(14px + env(safe-area-inset-top,0px)) 14px calc(16px + env(safe-area-inset-bottom,0px))}
   .cal-d{min-height:54px}
-  .cal-join select,.dialog.cal .field input,.dialog.cal .field textarea{font-size:16px}
+  .dialog.cal .field input,.dialog.cal .field textarea{font-size:16px}
 }

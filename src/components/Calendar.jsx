@@ -3,7 +3,6 @@ import { ymd } from '../config';
 import { Avatar } from './Panel';
 import { ConfirmButton } from './Dialogs';
 
-const ME_STORE = 'komechalle-me'; // 「参加する」で最後に選んだメンバー（この端末だけ）
 const WEEK = ['日', '月', '火', '水', '木', '金', '土'];
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -96,10 +95,14 @@ function EventDetail({ ev, nodes, edges, isAdmin, onBack, onEdit, onDelete, onJo
     .filter((x) => x.m?.kind === 'member');
   const members = nodes.filter((n) => n.kind === 'member' && !joins.some((x) => x.m.id === n.id))
     .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
-  const [me, setMe] = useState(() => {
-    try { return localStorage.getItem(ME_STORE) || ''; } catch { return ''; }
-  });
-  const pick = members.some((m) => m.id === me) ? me : '';
+  const [picked, setPicked] = useState(() => new Set());
+  const [busy, setBusy] = useState(false);
+  const chosen = members.filter((m) => picked.has(m.id));
+  const toggle = (id) => {
+    const next = new Set(picked);
+    next.has(id) ? next.delete(id) : next.add(id);
+    setPicked(next);
+  };
 
   return (
     <div>
@@ -127,18 +130,31 @@ function EventDetail({ ev, nodes, edges, isAdmin, onBack, onEdit, onDelete, onJo
       {members.length > 0 && (
         <form
           className="cal-join"
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
-            if (!pick) return;
-            try { localStorage.setItem(ME_STORE, pick); } catch { /* noop */ }
-            onJoin(pick);
+            if (!chosen.length || busy) return;
+            setBusy(true);
+            await onJoin(chosen.map((m) => m.id));
+            setPicked(new Set());
+            setBusy(false);
           }}
         >
-          <select value={pick} onChange={(e) => setMe(e.target.value)} aria-label="参加するメンバー">
-            <option value="">だれが参加しますか？</option>
-            {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-          </select>
-          <button type="submit" className="btn primary" disabled={!pick}>参加する</button>
+          <h3>参加する人を選ぶ（何人でも）</h3>
+          <div className="pick" role="group" aria-label="参加するメンバー">
+            {members.map((m) => (
+              <label key={m.id} className={picked.has(m.id) ? 'on' : ''}>
+                <input type="checkbox" checked={picked.has(m.id)} onChange={() => toggle(m.id)} />
+                <Avatar n={m} size={28} />
+                <span>{m.name}</span>
+              </label>
+            ))}
+          </div>
+          <div className="pick-foot">
+            {chosen.length > 0 && <button type="button" className="btn small" onClick={() => setPicked(new Set())}>選択をやめる</button>}
+            <button type="submit" className="btn primary" disabled={!chosen.length || busy}>
+              {busy ? '保存中…' : chosen.length ? `${chosen.length}人を参加にする` : '参加する人を選んでください'}
+            </button>
+          </div>
         </form>
       )}
 
@@ -195,7 +211,7 @@ export default function CalendarDialog({ nodes, edges, isAdmin, onClose, onSaveE
         onBack={() => setOpenId(null)}
         onEdit={() => setForm({ ev: open })}
         onDelete={() => { setOpenId(null); onDeleteEvent(open.id); }}
-        onJoin={(mid) => onJoin(mid, open)}
+        onJoin={(mids) => onJoin(mids, open)}
         onLeave={onLeave}
         onGoto={onGoto}
       />

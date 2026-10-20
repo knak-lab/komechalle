@@ -117,6 +117,11 @@ const ACTIONS = {
     appendEdges_([req.edge]);
   },
 
+  // { edges: [...] } カレンダーで何人かまとめて参加にするときなど
+  addEdges(req) {
+    appendEdges_(req.edges);
+  },
+
   // 線はだれでも消せる（気軽に使えることを優先。消しすぎてもまたつなげばいい）
   deleteEdge(req) {
     deleteRows_(sheet_('edges', EDGE_COLS), EDGE_COLS, (e) => e.id === req.id);
@@ -301,7 +306,7 @@ function log_(req) {
   appendObj_(sheet_('log', LOG_COLS), LOG_COLS, {
     at: new Date().toISOString(),
     action: req.action,
-    target: req.id || (req.edge && req.edge.id) || (req.nodes && req.nodes[0] && req.nodes[0].id) || '',
+    target: req.id || (req.edge && req.edge.id) || (req.edges && req.edges[0] && req.edges[0].id) || (req.nodes && req.nodes[0] && req.nodes[0].id) || '',
     detail: JSON.stringify(detail).slice(0, 1000),
   });
 }
