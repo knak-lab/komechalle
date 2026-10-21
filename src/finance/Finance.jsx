@@ -293,6 +293,15 @@ function SalesTab({ fin, ctx, year, api, events }) {
         <div className="dfoot"><button type="submit" className="btn primary" disabled={!products.length || !num(f.qty)}>登録する</button></div>
       </form>
 
+      <div className="fin-since">
+        <label htmlFor="s-since">カモの小屋から取り込む売上の開始日</label>
+        <input
+          type="date" id="s-since" defaultValue={fin.settings.kamoSince || ''} key={fin.settings.kamoSince || ''}
+          onChange={(e) => e.target.value !== (fin.settings.kamoSince || '') && api.save('settings', { key: 'kamoSince', value: e.target.value }, '開始日を保存しました。次の取り込みから使います')}
+        />
+        <small>空欄ならいちばん古い収穫日から。開始日より前の取り込み分は、次の取り込みで外れます</small>
+      </div>
+
       {unlinked.size > 0 && (
         <>
           <h3>未紐づけ（カモの小屋の商品）</h3>

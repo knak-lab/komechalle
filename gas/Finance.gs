@@ -8,6 +8,8 @@
  *   KAMO_API_URL   : カモの小屋の GAS ウェブアプリの URL（末尾 /exec）
  *   KAMO_API_TOKEN : カモの小屋の API_TOKEN
  *
+ * fin_settings の kamoSince（YYYY-MM-DD）より前の売上は取り込まない（未設定ならいちばん古い収穫日から）
+ *
  * 毎日の自動取り込みは setupFinanceTrigger() を一度実行して設定する。
  */
 
@@ -173,7 +175,10 @@ function syncFromKamo_() {
 
   const H = FIN_TABLES.harvest;
   const harvests = readAll_(H.sheet, H.cols);
-  const since = harvests.map((h) => h.harvestDate).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort()[0] || '2026-01-01';
+  // 取り込む売上の開始日：設定（kamoSince）があればそれ、なければいちばん古い収穫日
+  const setting = readAll_(FIN_TABLES.settings.sheet, FIN_TABLES.settings.cols).find((x) => x.key === 'kamoSince');
+  const since = (setting && /^\d{4}-\d{2}-\d{2}$/.test(setting.value) ? setting.value : '')
+    || harvests.map((h) => h.harvestDate).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort()[0] || '2026-01-01';
   const res = UrlFetchApp.fetch(url + '?action=komechalleExport&since=' + since + '&token=' + encodeURIComponent(token), { muteHttpExceptions: true, followRedirects: true });
   let data;
   try { data = JSON.parse(res.getContentText()); } catch (_) { throw new Error('カモの小屋から読み込めませんでした（HTTP ' + res.getResponseCode() + '）'); }
@@ -193,6 +198,8 @@ function syncFromKamo_() {
   const products = readAll_(P.sheet, P.cols);
   const cookRatio = finCookRatio_();
   const ssh = sheet_(S.sheet, S.cols);
+  // 開始日を後ろにずらしたときのため、開始日より前の取り込み分は消す（手入力の売上は消さない）
+  deleteRows_(ssh, S.cols, (r) => r.source === 'kamo' && r.date < since);
   const have = new Set(columnValues_(ssh, 'id', S.cols));
   const events = readAll_('nodes', NODE_COLS).filter((n) => n.kind === 'event');
   const channelOf = (c) => (String(c).toUpperCase() === 'BASE' ? 'online' : 'store');

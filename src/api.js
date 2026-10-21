@@ -70,6 +70,9 @@ export async function finCall(action, payload = {}) {
   else if (action === 'finLinkKamo') fin = applyLink(fin, payload.kamoProductId, payload.productId);
   else if (action === 'syncFromKamo') {
     const x = sampleKamoExport();
+    const since = fin.settings.kamoSince || '';
+    x.sales = x.sales.filter((s) => s.date >= since);
+    fin = { ...fin, sales: fin.sales.filter((s) => s.source !== 'kamo' || s.date >= since) };
     const have = new Set(fin.sales.map((s) => s.id));
     const added = x.sales.filter((s) => !have.has('kamo:' + s.id)).map((s) => {
       const p = fin.products.find((q) => q.kamoProductId && q.kamoProductId === s.productId);
