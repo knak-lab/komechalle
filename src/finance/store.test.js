@@ -29,3 +29,13 @@ describe('カモの小屋の商品から収支の商品を作る', () => {
     expect(fin.sales[0].riceGAtSale).toBe(50);
   });
 });
+
+describe('セット商品', () => {
+  it('米チャレ以外の分を売上と手残りから引く', async () => {
+    const { salesSummary, unitEconomics } = await import('./calc');
+    const products = [{ id: 'set', price: 800, setOther: '450', materials: '[{"amount":20}]' }];
+    const sales = [{ productId: 'set', qty: 10, amount: 8000, variableCostAtSale: 20 }];
+    expect(salesSummary(sales, { products })).toMatchObject({ amount: 3500, keep: 3300 });
+    expect(unitEconomics(products[0]).keep).toBe(330);
+  });
+});

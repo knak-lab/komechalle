@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { finCall } from '../api';
 import { uid } from '../config';
-import { bool, kgf, num, pct, salesSummary, unitEconomics, yearContext, yearOfDate, yen, yen1 } from './calc';
+import { bool, kgf, komeAmount, num, pct, saleKeep, salesSummary, unitEconomics, yearContext, yearOfDate, yen, yen1 } from './calc';
 import { CHANNELS, applyDelete, applyLink, applySave, emptyFin } from './store';
 import { CostsTab, HarvestTab, ProductsTab } from './Edit';
 import PricingTab from './Pricing';
@@ -148,7 +148,7 @@ export default function FinanceDialog({ adminKey, nodes, onClose, toast }) {
 
 function SummaryTab({ fin, ctx, year, events }) {
   const sales = fin.sales.filter((s) => saleYear(s, fin.harvest) === year && s.productId);
-  const sum = salesSummary(sales, { totalCost: ctx.totalCost, hakumaiKg: ctx.kg.hakumaiKg });
+  const sum = salesSummary(sales, { totalCost: ctx.totalCost, hakumaiKg: ctx.kg.hakumaiKg, products: fin.products });
   const recovered = Math.min(1, Math.max(0, sum.recovery || 0));
   const products = fin.products.filter((p) => bool(p.active));
   const byEvent = new Map();
@@ -156,8 +156,8 @@ function SummaryTab({ fin, ctx, year, events }) {
     const k = s.eventId || '';
     const g = byEvent.get(k) || { qty: 0, amount: 0, keep: 0 };
     g.qty += num(s.qty) || 0;
-    g.amount += num(s.amount) || 0;
-    g.keep += (num(s.amount) || 0) - (num(s.variableCostAtSale) || 0) * (num(s.qty) || 0);
+    g.amount += komeAmount(s, fin.products);
+    g.keep += saleKeep(s, fin.products);
     byEvent.set(k, g);
   }
   const evRows = [...byEvent.entries()].map(([id, g]) => ({ id, ev: events.find((e) => e.id === id), ...g }))
@@ -332,7 +332,7 @@ function SalesTab({ fin, ctx, year, api, events }) {
                   <span className="d">{md(s.date)}</span>
                   <span className="t">{p ? p.name : <em>未紐づけ：{s.kamoProductId}</em>}<small>{[ev?.name, s.source === 'kamo' ? 'カモの小屋' : ''].filter(Boolean).join('・')}</small></span>
                   <span className="n">{(num(s.qty) || 0).toLocaleString()}個</span>
-                  <span className="n">{yen(num(s.amount))}</span>
+                  <span className="n">{yen(komeAmount(s, fin.products))}{komeAmount(s, fin.products) !== (num(s.amount) || 0) && <small>セット {yen(num(s.amount))}</small>}</span>
                 </button>
                 {isOpen && (
                   <div className="more">

@@ -20,7 +20,7 @@ const FIN_TABLES = {
   assets: { sheet: 'fin_assets', key: 'id', cols: ['id', 'label', 'price', 'startYear', 'years'] },
   products: {
     sheet: 'fin_products', key: 'id',
-    cols: ['id', 'name', 'channel', 'price', 'cookedG', 'riceRawG', 'materials', 'shipping', 'customerPaysShipping', 'feeRate', 'feeFixed', 'kamoProductId', 'active'],
+    cols: ['id', 'name', 'channel', 'price', 'cookedG', 'riceRawG', 'materials', 'shipping', 'customerPaysShipping', 'feeRate', 'feeFixed', 'kamoProductId', 'active', 'setOther'],
   },
   sales: {
     sheet: 'fin_sales', key: 'id',

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { num, pct, sameKeepQty, unitEconomics, yen, yen1 } from './calc';
 import { Num, ProductFields } from './Edit';
 
-const blank = { channel: 'event', price: '', cookedG: '80', riceRawG: '', materials: '[]', shipping: '', customerPaysShipping: false, feeRate: '', feeFixed: '' };
+const blank = { channel: 'event', price: '', cookedG: '80', riceRawG: '', materials: '[]', shipping: '', customerPaysShipping: false, feeRate: '', feeFixed: '', setOther: '' };
 
 // 値段を決めるための計算。保存しなくても使える。「この値段で商品に反映」だけが保存する
 export default function PricingTab({ fin, ctx, api }) {

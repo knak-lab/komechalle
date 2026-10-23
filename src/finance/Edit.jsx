@@ -228,6 +228,7 @@ export function UnitBox({ u }) {
   return (
     <dl className="fin-unit">
       <dt>お客さまの支払い</dt><dd>{yen1(u.pays)}</dd>
+      {u.setOther ? <><dt>セットの米チャレ以外の分</dt><dd>−{yen1(u.setOther)}</dd></> : null}
       <dt>変動費（資材＋送料＋手数料）</dt><dd>{yen1(u.variable)}{u.fee ? <small>手数料 {yen1(u.fee)}</small> : null}</dd>
       <dt>手残り</dt><dd><b>{yen1(u.keep)}</b></dd>
       <dt>お米の原価（生米 {Math.round(u.riceG * 10) / 10}g）</dt><dd>{yen1(u.riceCost)}</dd>
@@ -255,6 +256,8 @@ export function ProductFields({ f, set, ctx, lockPrice = false }) {
         <Num id="p-raw" label="生米（白米）" unit="g" value={f.riceRawG} onChange={set('riceRawG')}
           placeholder={num(f.cookedG) != null ? `自動：${Math.round(riceG(f, ctx.cookRatio) * 10) / 10}` : ''} />
       </div>
+      <Num id="p-other" label="セット商品：米チャレ以外の分（1個あたり）" unit="円" value={f.setOther} onChange={set('setOther')}
+        placeholder="例：おにぎり豚汁セットなら豚汁の分" />
       <MaterialsEditor value={f.materials} onChange={set('materials')} />
       <div className="row3">
         <Num id="p-ship" label="送料" unit="円" value={f.shipping} onChange={set('shipping')} />
@@ -272,7 +275,7 @@ export function ProductFields({ f, set, ctx, lockPrice = false }) {
 const toForm = (p) => ({
   name: s(p?.name), channel: p?.channel || 'event', price: s(p?.price), cookedG: s(p?.cookedG), riceRawG: s(p?.riceRawG),
   materials: p?.materials || '[]', shipping: s(p?.shipping), customerPaysShipping: bool(p?.customerPaysShipping),
-  feeRate: s(p?.feeRate), feeFixed: s(p?.feeFixed), kamoProductId: s(p?.kamoProductId), active: p ? bool(p.active) : true,
+  feeRate: s(p?.feeRate), feeFixed: s(p?.feeFixed), setOther: s(p?.setOther), kamoProductId: s(p?.kamoProductId), active: p ? bool(p.active) : true,
 });
 
 function ProductForm({ row, ctx, onSave, onCancel }) {

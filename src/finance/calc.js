@@ -85,14 +85,16 @@ export function unitEconomics(p, { costPerKg = 0, totalCost = 0, cookRatio = DEF
   const fee = feeRate || feeFixed ? pays * feeRate + feeFixed : 0;
   const materials = sum(parseMaterials(p.materials).map((m) => num(m.amount) || 0));
   const variable = materials + shipping + fee;
-  const keep = pays - variable;
+  // セット商品（おにぎり＋豚汁など）の米チャレ以外の分は、米チャレの売上に入れない
+  const setOther = num(p.setOther) || 0;
+  const keep = pays - setOther - variable;
   const g = riceG(p, cookRatio);
   const riceCost = (g / 1000) * costPerKg;
   return {
-    pays, fee, materials, variable, keep, riceG: g, riceCost,
+    pays, fee, materials, variable, setOther, keep, riceG: g, riceCost,
     gross: keep - riceCost,
     unitCost: riceCost + materials,
-    costRate: price ? (riceCost + materials) / price : null,
+    costRate: price - setOther > 0 ? (riceCost + materials) / (price - setOther) : null,
     breakEven: breakEvenQty(totalCost, keep),
   };
 }
@@ -118,9 +120,17 @@ export function yearOfDate(date, harvests = []) {
   return String(date).slice(5) < hs[0].harvestDate.slice(5) ? cal - 1 : cal;
 }
 
-export function salesSummary(sales, { totalCost = 0, hakumaiKg = null } = {}) {
-  const keep = sum(sales.map((s) => (num(s.amount) || 0) - (num(s.variableCostAtSale) || 0) * (num(s.qty) || 0)));
-  const amount = sum(sales.map((s) => num(s.amount) || 0));
+// 米チャレの売上：セット商品は、商品の setOther（1個あたり）×数量を引く
+export function komeAmount(s, products = []) {
+  const p = products.find((x) => x.id === s.productId);
+  return Math.max(0, (num(s.amount) || 0) - (num(p?.setOther) || 0) * (num(s.qty) || 0));
+}
+
+export const saleKeep = (s, products = []) => komeAmount(s, products) - (num(s.variableCostAtSale) || 0) * (num(s.qty) || 0);
+
+export function salesSummary(sales, { totalCost = 0, hakumaiKg = null, products = [] } = {}) {
+  const keep = sum(sales.map((s) => saleKeep(s, products)));
+  const amount = sum(sales.map((s) => komeAmount(s, products)));
   const riceUsedKg = sum(sales.map((s) => (num(s.qty) || 0) * (num(s.riceGAtSale) || 0))) / 1000;
   return {
     amount, keep, riceUsedKg,
