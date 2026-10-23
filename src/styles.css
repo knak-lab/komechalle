@@ -285,6 +285,9 @@ table.fin-table{width:100%;border-collapse:collapse;font-size:13px;font-variant-
 .fin-table th:first-child,.fin-table td:first-child{text-align:left;white-space:normal}
 .fin-table thead th{font-size:11px;color:var(--muted);font-weight:700}
 .fin-table small,.fin-list small,.fin-unit small{display:block;font-size:11px;color:var(--muted);font-weight:400}
+.fin-list small b.warn{color:var(--warn);font-weight:600}
+.locked{margin:0;padding:6px 0;font-weight:600}
+.locked small{display:block;font-size:11px;color:var(--muted);font-weight:400}
 .fin-table.cmp tbody th{font-weight:500;font-size:12px;color:var(--muted);min-width:9em}
 .fin-table.cmp thead th{font-size:15px;color:var(--ink);font-family:var(--f-display)}
 ul.fin-list{list-style:none;margin:0 0 10px;padding:0;display:grid;gap:6px}

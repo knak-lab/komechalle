@@ -71,7 +71,7 @@ export default function FinanceDialog({ adminKey, nodes, onClose, toast }) {
     setSyncing(true);
     try {
       const r = await finCall('syncFromKamo', { adminKey });
-      toast(`カモの小屋から${r.added}件取り込みました${r.unlinked ? `（未紐づけ ${r.unlinked}件）` : ''}`);
+      toast(`カモの小屋から${r.added}件取り込みました${r.created ? `。商品を${r.created}件作りました。「商品」タブでご飯の量を入れてください` : ''}${r.unlinked ? `（未紐づけ ${r.unlinked}件）` : ''}`);
       await load();
     } catch (e) {
       toast('取り込めませんでした：' + e.message);

@@ -60,7 +60,7 @@ const FIN_DEMO_KEY = 'komechalle-fin-demo-v1';
 export async function finCall(action, payload = {}) {
   if (!isDemo) return call(action, payload);
   const { sampleFinance, sampleKamoExport } = await import('./sample');
-  const { applyDelete, applyLink, applySave } = await import('./finance/store');
+  const { applyDelete, applyKamoProducts, applyLink, applySave, fillKamoSales } = await import('./finance/store');
   let fin;
   try { fin = JSON.parse(localStorage.getItem(FIN_DEMO_KEY)); } catch { /* 壊れていたらサンプルから */ }
   if (!fin || !Array.isArray(fin.products)) fin = sampleFinance();
@@ -73,18 +73,17 @@ export async function finCall(action, payload = {}) {
     const since = fin.settings.kamoSince || '';
     x.sales = x.sales.filter((s) => s.date >= since);
     fin = { ...fin, sales: fin.sales.filter((s) => s.source !== 'kamo' || s.date >= since) };
+    const before = fin.products.length;
+    fin = applyKamoProducts(fin, x.products);
     const have = new Set(fin.sales.map((s) => s.id));
-    const added = x.sales.filter((s) => !have.has('kamo:' + s.id)).map((s) => {
-      const p = fin.products.find((q) => q.kamoProductId && q.kamoProductId === s.productId);
-      return {
-        id: 'kamo:' + s.id, source: 'kamo', date: s.date, year: '', productId: p ? p.id : '', eventId: '', qty: s.qty,
-        unitPrice: s.amount / s.qty, amount: s.amount, variableCostAtSale: '', riceGAtSale: '',
-        channel: s.channel === 'BASE' ? 'online' : 'store', kamoProductId: s.productId, yearManual: '',
-      };
-    });
+    const added = x.sales.filter((s) => !have.has('kamo:' + s.id)).map((s) => ({
+      id: 'kamo:' + s.id, source: 'kamo', date: s.date, year: '', productId: '', eventId: '', qty: s.qty,
+      unitPrice: s.amount / s.qty, amount: s.amount, variableCostAtSale: '', riceGAtSale: '',
+      channel: s.channel === 'BASE' ? 'online' : 'store', kamoProductId: s.productId, yearManual: '',
+    }));
     const now = new Date().toISOString();
-    fin = { ...fin, kamoProducts: x.products.map((p) => ({ ...p, syncedAt: now })), sales: [...fin.sales, ...added], settings: { ...fin.settings, kamoLastSyncAt: now } };
-    res = { added: added.length, unlinked: added.filter((s) => !s.productId).length };
+    fin = fillKamoSales({ ...fin, kamoProducts: x.products.map((p) => ({ ...p, syncedAt: now })), sales: [...fin.sales, ...added], settings: { ...fin.settings, kamoLastSyncAt: now } });
+    res = { added: added.length, created: fin.products.length - before };
   }
   try { localStorage.setItem(FIN_DEMO_KEY, JSON.stringify(fin)); } catch { /* noop */ }
   return action === 'finance' ? { ok: true, fin } : { ok: true, ...res };

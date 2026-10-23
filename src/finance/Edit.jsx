@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { uid } from '../config';
 import { ConfirmButton } from '../components/Dialogs';
 import { bool, costAmount, depreciation, harvestKg, kgf, num, parseMaterials, pct, riceG, unitEconomics, yen, yen1 } from './calc';
-import { CHANNELS } from './store';
+import { CHANNELS, hasRice } from './store';
 
 const COST_CATEGORIES = ['種', '肥料', '農薬', '燃料', 'もみすり', '精米', '資材', '出店料', '人件費', 'その他'];
 
@@ -237,7 +237,8 @@ export function UnitBox({ u }) {
   );
 }
 
-export function ProductFields({ f, set, ctx }) {
+// lockPrice: カモの小屋の商品は値段をカモの小屋で変える
+export function ProductFields({ f, set, ctx, lockPrice = false }) {
   return (
     <>
       <div className="row2">
@@ -245,7 +246,9 @@ export function ProductFields({ f, set, ctx }) {
           <select id="p-ch" value={f.channel} onChange={(e) => set('channel')(e.target.value)}>
             {Object.entries(CHANNELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select></div>
-        <Num id="p-price" label="値段" unit="円" value={f.price} onChange={set('price')} />
+        {lockPrice
+          ? <div className="field"><span className="lab">値段</span><p className="locked">{yen(num(f.price))}<small>カモの小屋で変更</small></p></div>
+          : <Num id="p-price" label="値段" unit="円" value={f.price} onChange={set('price')} />}
       </div>
       <div className="row2">
         <Num id="p-cooked" label="炊いた重さ" unit="g" value={f.cookedG} onChange={set('cookedG')} />
@@ -272,33 +275,24 @@ const toForm = (p) => ({
   feeRate: s(p?.feeRate), feeFixed: s(p?.feeFixed), kamoProductId: s(p?.kamoProductId), active: p ? bool(p.active) : true,
 });
 
-function ProductForm({ row, fin, ctx, onSave, onCancel }) {
+function ProductForm({ row, ctx, onSave, onCancel }) {
   const [f, setF] = useState(() => toForm(row));
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
   const u = unitEconomics(f, ctx);
-  const kp = fin.kamoProducts;
+  const kamo = !!f.kamoProductId;
   return (
     <form className="fin-form" onSubmit={(e) => { e.preventDefault(); if (f.name.trim()) onSave({ id: row?.id || uid('p'), ...f, name: f.name.trim() }); }}>
-      {!row && kp.length > 0 && (
-        <div className="field"><label htmlFor="p-from">カモの小屋の商品から作る</label>
-          <select id="p-from" defaultValue="" onChange={(e) => {
-            const k = kp.find((x) => x.id === e.target.value);
-            if (k) setF((x) => ({ ...x, name: k.name, price: s(k.price), kamoProductId: k.id }));
-          }}>
-            <option value="">（使わない）</option>
-            {kp.map((k) => <option key={k.id} value={k.id}>{k.name}（{yen(num(k.price))}）</option>)}
-          </select></div>
+      {kamo ? (
+        <div className="field"><span className="lab">名前</span><p className="locked">{f.name}<small>カモの小屋の商品（名前・値段・販売中はカモの小屋に合わせます）</small></p></div>
+      ) : (
+        <div className="field"><label htmlFor="p-name">名前</label>
+          <input type="text" id="p-name" required value={f.name} onChange={(e) => set('name')(e.target.value)} placeholder="例：焼きおにぎり（醤油）" /></div>
       )}
-      <div className="field"><label htmlFor="p-name">名前</label>
-        <input type="text" id="p-name" required value={f.name} onChange={(e) => set('name')(e.target.value)} placeholder="例：焼きおにぎり（醤油）" /></div>
-      <ProductFields f={f} set={set} ctx={ctx} />
-      <div className="field"><label htmlFor="p-kamo">カモの小屋の商品との紐づけ</label>
-        <select id="p-kamo" value={f.kamoProductId} onChange={(e) => set('kamoProductId')(e.target.value)}>
-          <option value="">（なし）</option>
-          {f.kamoProductId && !kp.some((k) => k.id === f.kamoProductId) && <option value={f.kamoProductId}>{f.kamoProductId}</option>}
-          {kp.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
-        </select></div>
-      <label className="check"><input type="checkbox" checked={f.active} onChange={(e) => set('active')(e.target.checked)} />販売中（外すと一覧や売上の入力に出なくなります）</label>
+      {kamo && !hasRice(f) && <p className="note">炊いた重さか生米のg数を入れると、取り込んだ売上の米の量と原価が出ます</p>}
+      <ProductFields f={f} set={set} ctx={ctx} lockPrice={kamo} />
+      {!kamo && (
+        <label className="check"><input type="checkbox" checked={f.active} onChange={(e) => set('active')(e.target.checked)} />販売中（外すと一覧や売上の入力に出なくなります）</label>
+      )}
       <UnitBox u={u} />
       <div className="dfoot">
         <button type="button" className="btn" onClick={onCancel}>キャンセル</button>
@@ -314,23 +308,25 @@ export function ProductsTab({ fin, ctx, api }) {
   return (
     <>
       {!ctx.costPerKg && <p className="note">「収穫」と「原価」を入れると、お米の原価と損益分岐が出ます。</p>}
+      <p className="note">カモの小屋で komechalle にチェックした商品は、取り込むと自動でここに入ります。ご飯の量と資材だけ入れてください。カモの小屋にない商品は「＋ 商品を追加」で作れます。</p>
       <ul className="fin-list">
         {fin.products.map((p) => {
-          if (edit?.id === p.id) return <li key={p.id} className="form"><ProductForm row={p} fin={fin} ctx={ctx} onCancel={() => setEdit(null)} onSave={(r) => done(r)} /></li>;
+          if (edit?.id === p.id) return <li key={p.id} className="form"><ProductForm row={p} ctx={ctx} onCancel={() => setEdit(null)} onSave={(r) => done(r)} /></li>;
           const u = unitEconomics(p, ctx);
           return (
             <li key={p.id} className={bool(p.active) ? '' : 'off'}>
               <button className="row" onClick={() => setEdit(p)}>
-                <span className="t">{p.name}<small>{CHANNELS[p.channel] || ''}・{yen(num(p.price))}{p.kamoProductId ? '・カモの小屋と紐づけ済み' : ''}{bool(p.active) ? '' : '・販売していない'}</small></span>
+                <span className="t">{p.name}<small>{CHANNELS[p.channel] || ''}・{yen(num(p.price))}{p.kamoProductId ? '・カモの小屋' : ''}{bool(p.active) ? '' : '・販売していない'}{hasRice(p) ? '' : <b className="warn">・ご飯の量が未入力</b>}</small></span>
                 <span className="n">手残り {yen1(u.keep)}<small>分岐 {u.breakEven != null ? `${u.breakEven.toLocaleString()}個` : '–'}</small></span>
               </button>
-              <ConfirmButton className="x" confirmText="消す？" onConfirm={() => api.remove('products', p.id)}>×</ConfirmButton>
+              {/* カモの小屋の商品は消しても次の取り込みでまたできるので、消せなくする */}
+              {!p.kamoProductId && <ConfirmButton className="x" confirmText="消す？" onConfirm={() => api.remove('products', p.id)}>×</ConfirmButton>}
             </li>
           );
         })}
       </ul>
       {edit && !edit.id
-        ? <ProductForm fin={fin} ctx={ctx} onCancel={() => setEdit(null)} onSave={(r) => done(r, '商品を追加しました')} />
+        ? <ProductForm ctx={ctx} onCancel={() => setEdit(null)} onSave={(r) => done(r, '商品を追加しました')} />
         : <button className="btn" onClick={() => setEdit({})}>＋ 商品を追加</button>}
     </>
   );

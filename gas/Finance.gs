@@ -59,6 +59,8 @@ const FIN_ACTIONS = {
     allowed.forEach((c) => { if (c in row) clean[c] = limit_(row[c], 2000); });
     if (findRow_(sh, key)) updateRow_(sh, t.cols, key, clean);
     else appendObj_(sh, t.cols, clean);
+    // ご飯の量が入ったら、まだ空いている取り込み売上の米の量・変動費を埋める
+    if (req.table === 'products') finFillKamoSales_();
   },
 
   finDelete(req) {
@@ -71,7 +73,6 @@ const FIN_ACTIONS = {
   finLinkKamo(req) {
     checkAdmin_(req);
     const P = FIN_TABLES.products;
-    const S = FIN_TABLES.sales;
     const products = readAll_(P.sheet, P.cols);
     const p = products.find((x) => x.id === req.productId);
     if (!p) throw new Error('商品が見つかりません');
@@ -80,16 +81,7 @@ const FIN_ACTIONS = {
     products.filter((x) => x.kamoProductId === req.kamoProductId && x.id !== p.id)
       .forEach((x) => updateRow_(psh, P.cols, x.id, { kamoProductId: '' }));
     updateRow_(psh, P.cols, p.id, { kamoProductId: req.kamoProductId });
-    const ssh = sheet_(S.sheet, S.cols);
-    const unit = finUnit_(p, finCookRatio_());
-    let n = 0;
-    readAll_(S.sheet, S.cols)
-      .filter((s) => s.source === 'kamo' && s.kamoProductId === req.kamoProductId && !s.productId)
-      .forEach((s) => {
-        updateRow_(ssh, S.cols, s.id, { productId: p.id, channel: p.channel, variableCostAtSale: unit.variable, riceGAtSale: unit.riceG });
-        n++;
-      });
-    return { linked: n };
+    return { linked: finFillKamoSales_() };
   },
 
   syncFromKamo(req) {
@@ -133,6 +125,10 @@ function finCookRatio_() {
 
 function finNum_(v) {
   return v === '' || v == null || !isFinite(Number(v)) ? null : Number(v);
+}
+
+function finHasRice_(p) {
+  return finNum_(p.riceRawG) != null || finNum_(p.cookedG) != null;
 }
 
 function finUnit_(p, cookRatio) {
@@ -192,11 +188,10 @@ function syncFromKamo_() {
   const krows = (data.products || []).map((p) => [p.id, p.name, p.price, p.active, now].map(toCell_));
   if (krows.length) ksh.getRange(2, 1, krows.length, K.cols.length).setNumberFormat('@').setValues(krows);
 
-  // 売上は新しいものだけ追加。変動費は米チャレ側の商品の値を使う（カモの小屋の原価にお米代が入っていると二重になるため）
-  const P = FIN_TABLES.products;
+  const created = finSyncKamoProducts_(data.products || []);
+
+  // 売上は新しいものだけ追加。商品と変動費はあとの finFillKamoSales_ でつける
   const S = FIN_TABLES.sales;
-  const products = readAll_(P.sheet, P.cols);
-  const cookRatio = finCookRatio_();
   const ssh = sheet_(S.sheet, S.cols);
   // 開始日を後ろにずらしたときのため、開始日より前の取り込み分は消す（手入力の売上は消さない）
   deleteRows_(ssh, S.cols, (r) => r.source === 'kamo' && r.date < since);
@@ -204,21 +199,17 @@ function syncFromKamo_() {
   const events = readAll_('nodes', NODE_COLS).filter((n) => n.kind === 'event');
   const channelOf = (c) => (String(c).toUpperCase() === 'BASE' ? 'online' : 'store');
   const rows = [];
-  let unlinked = 0;
   (data.sales || []).forEach((s) => {
     const id = 'kamo:' + s.id;
     if (have.has(id)) return;
     have.add(id);
-    const p = products.find((x) => x.kamoProductId && x.kamoProductId === s.productId);
-    const unit = p ? finUnit_(p, cookRatio) : null;
     const sameDay = events.filter((e) => e.date === s.date);
-    if (!p) unlinked++;
     const qty = Number(s.qty) || 0;
     rows.push({
-      id: id, source: 'kamo', date: s.date, year: finYearOf_(s.date, harvests), productId: p ? p.id : '',
+      id: id, source: 'kamo', date: s.date, year: finYearOf_(s.date, harvests), productId: '',
       eventId: sameDay.length === 1 ? sameDay[0].id : '', qty: qty, unitPrice: qty ? (Number(s.amount) || 0) / qty : '',
-      amount: Number(s.amount) || 0, variableCostAtSale: unit ? unit.variable : '', riceGAtSale: unit ? unit.riceG : '',
-      channel: p ? p.channel : channelOf(s.channel), kamoProductId: s.productId, yearManual: '',
+      amount: Number(s.amount) || 0, variableCostAtSale: '', riceGAtSale: '',
+      channel: channelOf(s.channel), kamoProductId: s.productId, yearManual: '',
     });
   });
   if (rows.length) {
@@ -226,8 +217,63 @@ function syncFromKamo_() {
     ssh.getRange(start, 1, rows.length, S.cols.length).setNumberFormat('@')
       .setValues(rows.map((r) => S.cols.map((c) => toCell_(r[c]))));
   }
+  finFillKamoSales_();
+  const unlinked = readAll_(S.sheet, S.cols).filter((r) => r.source === 'kamo' && !r.productId).length;
   finSetting_('kamoLastSyncAt', now);
-  return { added: rows.length, unlinked: unlinked, products: krows.length, syncedAt: now };
+  return { added: rows.length, created: created, unlinked: unlinked, products: krows.length, syncedAt: now };
+}
+
+// カモの小屋の商品ごとに米チャレの商品を1つ作る。名前・値段・販売中はカモの小屋に合わせる（store.js の applyKamoProducts と同じ）
+function finSyncKamoProducts_(kamoProducts) {
+  const P = FIN_TABLES.products;
+  const sh = sheet_(P.sheet, P.cols);
+  const products = readAll_(P.sheet, P.cols);
+  let created = 0;
+  kamoProducts.forEach((k) => {
+    const kid = String(k.id);
+    const sync = { name: String(k.name), price: toCell_(k.price), active: toCell_(k.active !== false) };
+    const p = products.find((x) => x.kamoProductId === kid);
+    if (!p) {
+      appendObj_(sh, P.cols, Object.assign({ id: 'kamo:' + kid, channel: 'store', materials: '[]', customerPaysShipping: 'false', kamoProductId: kid }, sync));
+      created++;
+    } else if (Object.keys(sync).some((c) => String(p[c]).toUpperCase() !== sync[c].toUpperCase())) {
+      updateRow_(sh, P.cols, p.id, sync);
+    }
+  });
+  return created;
+}
+
+// 取り込んだ売上に商品をつけ、ご飯の量が入った商品なら米の量と変動費を記録する（記録済みは変えない。store.js の fillKamoSales と同じ）
+function finFillKamoSales_() {
+  const P = FIN_TABLES.products;
+  const S = FIN_TABLES.sales;
+  const products = readAll_(P.sheet, P.cols);
+  const sh = sheet_(S.sheet, S.cols);
+  if (sh.getLastRow() < 2) return 0;
+  const range = sh.getRange(2, 1, sh.getLastRow() - 1, S.cols.length);
+  const values = range.getDisplayValues();
+  const c = {};
+  S.cols.forEach((k, i) => { c[k] = i; });
+  const cookRatio = finCookRatio_();
+  let n = 0;
+  values.forEach((r) => {
+    if (r[c.source] !== 'kamo') return;
+    const p = r[c.productId]
+      ? products.find((x) => x.id === r[c.productId])
+      : products.find((x) => x.kamoProductId && x.kamoProductId === r[c.kamoProductId]);
+    if (!p) return;
+    let changed = false;
+    if (!r[c.productId]) { r[c.productId] = p.id; changed = true; }
+    if (r[c.riceGAtSale] === '' && finHasRice_(p)) {
+      const u = finUnit_(p, cookRatio);
+      r[c.variableCostAtSale] = String(u.variable);
+      r[c.riceGAtSale] = String(u.riceG);
+      changed = true;
+    }
+    if (changed) n++;
+  });
+  if (n) range.setNumberFormat('@').setValues(values);
+  return n;
 }
 
 /* ---------- 毎日の自動取り込み ---------- */
