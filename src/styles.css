@@ -286,10 +286,9 @@ ul.cal-list .c{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nu
 .fm-pct{font:700 13px var(--f-display);fill:#1E261C}
 .fm-cap{font:700 11px var(--f-body);fill:#1E261C}
 .fm-count{font:700 15px var(--f-display);fill:#1E261C}
-.fm-omg{font:900 20px var(--f-display);fill:#111;stroke:#fff;stroke-width:4px;paint-order:stroke}
 .fm-gorilla.happy{animation:fm-bob 1.6s ease-in-out infinite;transform-box:fill-box;transform-origin:50% 100%}
 .fm-smoke{animation:fm-puff 2s ease-in-out infinite}
-@keyframes fm-bob{50%{transform:translateY(-3px)}}
+@keyframes fm-bob{50%{transform:translateY(-6px)}}
 @keyframes fm-puff{50%{opacity:.4;transform:translateY(-3px)}}
 @media (prefers-reduced-motion: reduce){.fm-gorilla.happy,.fm-smoke{animation:none}.fm-fill{transition:none}}
 .fin-big b{font-family:var(--f-display);font-size:22px;font-variant-numeric:tabular-nums}
