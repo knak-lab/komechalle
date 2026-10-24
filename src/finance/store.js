@@ -1,5 +1,5 @@
 // 収支データの書きかえ（画面をすぐ変えるときと、デモモードの保存の両方で使う）
-import { num, unitEconomics } from './calc';
+import { hasRice, num, unitEconomics } from './calc';
 
 export const CHANNELS = { event: 'イベント', store: '店頭', online: 'ネット' };
 
@@ -33,8 +33,8 @@ export function applyLink(fin, kamoProductId, productId) {
 
 /* ---------- カモの小屋の取り込み（GAS の Finance.gs と同じ動き） ---------- */
 
-// ご飯の量が入っているか。入るまでは売上の米の量・原価を空けておく
-export const hasRice = (p) => num(p.riceRawG) != null || num(p.cookedG) != null;
+// 名前からセットかどうかを見当をつける（あとで画面で直せる）
+export const guessKind = (name) => (/セット|＆|&|ランチ|モーニング/.test(String(name)) ? 'set' : 'single');
 
 // カモの小屋の商品ごとに米チャレの商品を1つ作る。名前・値段・販売中はカモの小屋に合わせる
 export function applyKamoProducts(fin, kamoProducts) {
@@ -45,7 +45,7 @@ export function applyKamoProducts(fin, kamoProducts) {
     products = i >= 0
       ? products.map((p, j) => (j === i ? { ...p, ...sync } : p))
       : [...products, {
-        id: 'kamo:' + k.id, channel: 'store', cookedG: '', riceRawG: '', materials: '[]', shipping: '', customerPaysShipping: false,
+        id: 'kamo:' + k.id, channel: 'store', kind: guessKind(k.name), parts: '[]', cookedG: '', riceRawG: '', materials: '[]', shipping: '', customerPaysShipping: false,
         feeRate: '', feeFixed: '', kamoProductId: k.id, ...sync,
       }];
   });
@@ -53,8 +53,9 @@ export function applyKamoProducts(fin, kamoProducts) {
 }
 
 // 取り込んだ売上に商品をつけ、ご飯の量が入った商品なら米の量と変動費を記録する（記録済みのものは変えない）
-export function fillKamoSales(fin) {
-  const ctx = { cookRatio: num(fin.settings?.cookRatio) || undefined };
+// redo: 記録済みのものも、今の商品の設定で計算し直す
+export function fillKamoSales(fin, redo = false) {
+  const ctx = { cookRatio: num(fin.settings?.cookRatio) || undefined, products: fin.products };
   return {
     ...fin,
     sales: fin.sales.map((s) => {
@@ -64,7 +65,8 @@ export function fillKamoSales(fin) {
         : fin.products.find((x) => x.kamoProductId && x.kamoProductId === s.kamoProductId);
       if (!p) return s;
       let r = s.productId ? s : { ...s, productId: p.id };
-      if ((r.riceGAtSale === '' || r.riceGAtSale == null) && hasRice(p)) {
+      if (redo) r = { ...r, variableCostAtSale: '', riceGAtSale: '' };
+      if ((r.riceGAtSale === '' || r.riceGAtSale == null) && hasRice(p, fin.products)) {
         const u = unitEconomics(p, ctx);
         r = { ...r, variableCostAtSale: u.variable, riceGAtSale: u.riceG };
       }

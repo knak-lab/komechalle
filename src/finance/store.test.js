@@ -30,12 +30,32 @@ describe('カモの小屋の商品から収支の商品を作る', () => {
   });
 });
 
-describe('セット商品', () => {
-  it('米チャレ以外の分を売上と手残りから引く', async () => {
-    const { salesSummary, unitEconomics } = await import('./calc');
-    const products = [{ id: 'set', price: 800, setOther: '450', materials: '[{"amount":20}]' }];
-    const sales = [{ productId: 'set', qty: 10, amount: 8000, variableCostAtSale: 20 }];
-    expect(salesSummary(sales, { products })).toMatchObject({ amount: 3500, keep: 3300 });
-    expect(unitEconomics(products[0]).keep).toBe(330);
+describe('単品とセット', () => {
+  const products = [
+    { id: 'oni', kind: 'single', price: 220, riceRawG: '60', materials: '[{"amount":10}]' },
+    { id: 'set', kind: 'set', price: 800, parts: '[{"id":"oni","qty":2}]', materials: '[]' },
+  ];
+
+  it('セットは中身の単品の値段の分だけ米チャレの売上に数える', async () => {
+    const { salesSummary, unitEconomics, onigiriCounts } = await import('./calc');
+    const sales = [
+      { productId: 'set', qty: 10, amount: 8000, variableCostAtSale: 20 },
+      { productId: 'oni', qty: 5, amount: 1100, variableCostAtSale: 10 },
+    ];
+    // セット：8000 × 440/800 = 4400、単品 1100
+    expect(salesSummary(sales, { products })).toMatchObject({ amount: 5500, keep: 5500 - 200 - 50 });
+    expect(unitEconomics(products[1], { products })).toMatchObject({ setOther: 360, riceG: 120, variable: 20, keep: 420 });
+    expect(onigiriCounts(sales, products).get('oni')).toBe(25);
+  });
+
+  it('セットの米の量は中身が入ってから記録する', () => {
+    let fin = { ...emptyFin(), products: [products[0], { ...products[1], parts: '[]' }], sales: [sale('b', { productId: 'set', kamoProductId: 'x' })] };
+    fin = fillKamoSales(fin);
+    expect(fin.sales[0].riceGAtSale).toBe('');
+    fin = applySave(fin, 'products', { id: 'set', parts: '[{"id":"oni","qty":2}]' });
+    expect(fin.sales[0]).toMatchObject({ riceGAtSale: 120, variableCostAtSale: 20 });
+    fin = applySave(fin, 'products', { id: 'oni', riceRawG: '70' });
+    expect(fin.sales[0].riceGAtSale).toBe(120);
+    expect(fillKamoSales(fin, true).sales[0].riceGAtSale).toBe(140);
   });
 });

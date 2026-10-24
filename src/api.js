@@ -68,6 +68,7 @@ export async function finCall(action, payload = {}) {
   if (action === 'finSave') fin = applySave(fin, payload.table, payload.row);
   else if (action === 'finDelete') fin = applyDelete(fin, payload.table, payload.id);
   else if (action === 'finLinkKamo') fin = applyLink(fin, payload.kamoProductId, payload.productId);
+  else if (action === 'finRecalcKamo') fin = fillKamoSales(fin, true);
   else if (action === 'syncFromKamo') {
     const x = sampleKamoExport();
     const since = fin.settings.kamoSince || '';

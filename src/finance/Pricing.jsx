@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { num, pct, sameKeepQty, unitEconomics, yen, yen1 } from './calc';
+import { isSet, num, pct, sameKeepQty, unitEconomics, yen, yen1 } from './calc';
 import { Num, ProductFields } from './Edit';
 
-const blank = { channel: 'event', price: '', cookedG: '80', riceRawG: '', materials: '[]', shipping: '', customerPaysShipping: false, feeRate: '', feeFixed: '', setOther: '' };
+const blank = { channel: 'event', price: '', cookedG: '80', riceRawG: '', materials: '[]', shipping: '', customerPaysShipping: false, feeRate: '', feeFixed: '' };
 
 // 値段を決めるための計算。保存しなくても使える。「この値段で商品に反映」だけが保存する
 export default function PricingTab({ fin, ctx, api }) {
@@ -33,7 +33,7 @@ export default function PricingTab({ fin, ctx, api }) {
       <div className="field"><label htmlFor="pr-base">商品</label>
         <select id="pr-base" value={baseId} onChange={(e) => pick(e.target.value)}>
           <option value="">（新しい商品を考える）</option>
-          {fin.products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          {fin.products.filter((p) => !isSet(p)).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select></div>
       <ProductFields f={f} set={set} ctx={ctx} />
 

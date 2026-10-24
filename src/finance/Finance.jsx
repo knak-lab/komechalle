@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { finCall } from '../api';
 import { uid } from '../config';
-import { bool, kgf, komeAmount, num, pct, saleKeep, salesSummary, unitEconomics, yearContext, yearOfDate, yen, yen1 } from './calc';
-import { CHANNELS, applyDelete, applyLink, applySave, emptyFin } from './store';
+import { bool, kgf, komeAmount, num, onigiriCounts, pct, saleKeep, salesSummary, unitEconomics, yearContext, yearOfDate, yen, yen1 } from './calc';
+import { CHANNELS, applyDelete, applyLink, applySave, emptyFin, fillKamoSales } from './store';
 import { CostsTab, HarvestTab, ProductsTab } from './Edit';
 import PricingTab from './Pricing';
 
@@ -65,6 +65,7 @@ export default function FinanceDialog({ adminKey, nodes, onClose, toast }) {
     save: (table, row, msg = '保存しました') => run(applySave(fin, table, row), 'finSave', { table, row }, msg),
     remove: (table, id, msg = '削除しました') => run(applyDelete(fin, table, id), 'finDelete', { table, id }, msg),
     link: (kamoProductId, productId) => run(applyLink(fin, kamoProductId, productId), 'finLinkKamo', { kamoProductId, productId }, '紐づけました'),
+    recalc: () => run(fillKamoSales(fin, true), 'finRecalcKamo', {}, '取り込んだ売上を計算し直しました'),
   }), [fin, run]);
 
   async function sync() {
@@ -151,6 +152,9 @@ function SummaryTab({ fin, ctx, year, events }) {
   const sum = salesSummary(sales, { totalCost: ctx.totalCost, hakumaiKg: ctx.kg.hakumaiKg, products: fin.products });
   const recovered = Math.min(1, Math.max(0, sum.recovery || 0));
   const products = fin.products.filter((p) => bool(p.active));
+  const counts = [...onigiriCounts(sales, fin.products).entries()]
+    .map(([id, n]) => ({ p: fin.products.find((x) => x.id === id), n }))
+    .sort((a, b) => b.n - a.n);
   const byEvent = new Map();
   for (const s of sales) {
     const k = s.eventId || '';
@@ -187,6 +191,16 @@ function SummaryTab({ fin, ctx, year, events }) {
         {sum.riceLeftKg == null ? '収穫がまだ入っていません'
           : <><b>{kgf(sum.riceLeftKg)}</b>　（使った {kgf(sum.riceUsedKg)} ／ {pct(sum.riceUsedKg / ctx.kg.hakumaiKg)}）</>}
       </p>
+
+      <h3>おにぎりの販売数（セットの中身も数える）</h3>
+      {counts.length ? (
+        <ul className="fin-list">
+          {counts.map(({ p, n }) => (
+            <li key={p.id}><span className="row"><span className="t">{p.name}</span><span className="n">{n.toLocaleString()}個</span></span></li>
+          ))}
+          <li><span className="row"><span className="t"><b>合計</b></span><span className="n"><b>{counts.reduce((a, c) => a + c.n, 0).toLocaleString()}個</b></span></span></li>
+        </ul>
+      ) : <p className="note">売上が入ると出ます</p>}
 
       <h3>商品ごと（この商品だけで原価を回収する場合）</h3>
       {products.length ? (

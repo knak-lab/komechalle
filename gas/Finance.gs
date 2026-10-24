@@ -20,7 +20,8 @@ const FIN_TABLES = {
   assets: { sheet: 'fin_assets', key: 'id', cols: ['id', 'label', 'price', 'startYear', 'years'] },
   products: {
     sheet: 'fin_products', key: 'id',
-    cols: ['id', 'name', 'channel', 'price', 'cookedG', 'riceRawG', 'materials', 'shipping', 'customerPaysShipping', 'feeRate', 'feeFixed', 'kamoProductId', 'active', 'setOther'],
+    cols: ['id', 'name', 'channel', 'price', 'cookedG', 'riceRawG', 'materials', 'shipping', 'customerPaysShipping', 'feeRate', 'feeFixed', 'kamoProductId', 'active', 'setOther', 'kind', 'parts'],
+    // kind: single（単品）/ set（セット）。parts: セットの中身 [{ id: 単品の商品id, qty }]。setOther は使わなくなった列
   },
   sales: {
     sheet: 'fin_sales', key: 'id',
@@ -84,6 +85,12 @@ const FIN_ACTIONS = {
     return { linked: finFillKamoSales_() };
   },
 
+  // 取り込んだ売上の米の量・変動費を、今の商品の設定で計算し直す
+  finRecalcKamo(req) {
+    checkAdmin_(req);
+    return { updated: finFillKamoSales_(true) };
+  },
+
   syncFromKamo(req) {
     checkAdmin_(req);
     return syncFromKamo_();
@@ -127,8 +134,48 @@ function finNum_(v) {
   return v === '' || v == null || !isFinite(Number(v)) ? null : Number(v);
 }
 
-function finHasRice_(p) {
-  return finNum_(p.riceRawG) != null || finNum_(p.cookedG) != null;
+/* ---------- 単品とセット（src/finance/calc.js の expandSet と同じ考え方） ---------- */
+
+function finIsSet_(p) {
+  return !!p && p.kind === 'set';
+}
+
+function finParts_(p, products) {
+  let a = [];
+  try { a = JSON.parse(p.parts || '[]') || []; } catch (_) { /* 壊れていたら空 */ }
+  return a
+    .map((x) => ({ p: products.find((q) => q.id === String(x && x.id) && !finIsSet_(q)), qty: finNum_(x && x.qty) || 0 }))
+    .filter((x) => x.p && x.qty > 0);
+}
+
+function finHasRice_(p, products) {
+  if (!finIsSet_(p)) return finNum_(p.riceRawG) != null || finNum_(p.cookedG) != null;
+  const parts = finParts_(p, products || []);
+  return parts.length > 0 && parts.every((x) => finHasRice_(x.p));
+}
+
+function finMaterials_(p) {
+  let m = 0;
+  try { (JSON.parse(p.materials || '[]') || []).forEach((x) => { m += finNum_(x.amount) || 0; }); } catch (_) { /* 壊れていたら0 */ }
+  return m;
+}
+
+// セットはお米と資材に中身の単品の分を足す
+function finUnitOf_(p, products, cookRatio) {
+  const u = finUnit_(p, cookRatio);
+  if (!finIsSet_(p)) return u;
+  let riceG = 0;
+  let variable = u.variable;
+  finParts_(p, products).forEach((x) => {
+    riceG += finUnit_(x.p, cookRatio).riceG * x.qty;
+    variable += finMaterials_(x.p) * x.qty;
+  });
+  return { variable: variable, riceG: riceG };
+}
+
+// 名前からセットかどうかを見当をつける（あとで画面で直せる。store.js の guessKind と同じ）
+function finGuessKind_(name) {
+  return /セット|＆|&|ランチ|モーニング/.test(String(name)) ? 'set' : 'single';
 }
 
 function finUnit_(p, cookRatio) {
@@ -138,8 +185,7 @@ function finUnit_(p, cookRatio) {
   const feeRate = finNum_(p.feeRate) || 0;
   const feeFixed = finNum_(p.feeFixed) || 0;
   const fee = feeRate || feeFixed ? pays * feeRate + feeFixed : 0;
-  let materials = 0;
-  try { (JSON.parse(p.materials || '[]') || []).forEach((m) => { materials += finNum_(m.amount) || 0; }); } catch (_) { /* 壊れていたら0 */ }
+  const materials = finMaterials_(p);
   const raw = finNum_(p.riceRawG);
   const cooked = finNum_(p.cookedG);
   return {
@@ -234,7 +280,7 @@ function finSyncKamoProducts_(kamoProducts) {
     const sync = { name: String(k.name), price: toCell_(k.price), active: toCell_(k.active !== false) };
     const p = products.find((x) => x.kamoProductId === kid);
     if (!p) {
-      appendObj_(sh, P.cols, Object.assign({ id: 'kamo:' + kid, channel: 'store', materials: '[]', customerPaysShipping: 'false', kamoProductId: kid }, sync));
+      appendObj_(sh, P.cols, Object.assign({ id: 'kamo:' + kid, channel: 'store', kind: finGuessKind_(k.name), parts: '[]', materials: '[]', customerPaysShipping: 'false', kamoProductId: kid }, sync));
       created++;
     } else if (Object.keys(sync).some((c) => String(p[c]).toUpperCase() !== sync[c].toUpperCase())) {
       updateRow_(sh, P.cols, p.id, sync);
@@ -244,7 +290,8 @@ function finSyncKamoProducts_(kamoProducts) {
 }
 
 // 取り込んだ売上に商品をつけ、ご飯の量が入った商品なら米の量と変動費を記録する（記録済みは変えない。store.js の fillKamoSales と同じ）
-function finFillKamoSales_() {
+// redo: 記録済みのものも、今の商品の設定で計算し直す
+function finFillKamoSales_(redo) {
   const P = FIN_TABLES.products;
   const S = FIN_TABLES.sales;
   const products = readAll_(P.sheet, P.cols);
@@ -264,8 +311,13 @@ function finFillKamoSales_() {
     if (!p) return;
     let changed = false;
     if (!r[c.productId]) { r[c.productId] = p.id; changed = true; }
-    if (r[c.riceGAtSale] === '' && finHasRice_(p)) {
-      const u = finUnit_(p, cookRatio);
+    if (redo && (r[c.riceGAtSale] !== '' || r[c.variableCostAtSale] !== '')) {
+      r[c.riceGAtSale] = '';
+      r[c.variableCostAtSale] = '';
+      changed = true;
+    }
+    if (r[c.riceGAtSale] === '' && finHasRice_(p, products)) {
+      const u = finUnitOf_(p, products, cookRatio);
       r[c.variableCostAtSale] = String(u.variable);
       r[c.riceGAtSale] = String(u.riceG);
       changed = true;

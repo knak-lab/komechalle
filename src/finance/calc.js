@@ -68,6 +68,47 @@ export function yearCost({ costs = [], assets = [], year }) {
 
 /* ---------- 商品1単位 ---------- */
 
+// 商品は「単品」（おにぎり1個など。お米の量を持つ）と「セット」（単品を何個かと他のもの）
+export const isSet = (p) => p?.kind === 'set';
+
+// セットの中身：[{ id: 単品の商品id, qty: 個数 }]
+export function parseParts(v) {
+  return parseMaterials(v).filter((x) => x && x.id).map((x) => ({ id: String(x.id), qty: num(x.qty) || 0 }));
+}
+
+// セットの中身を単品で引く（見つからない・0個は外す）
+export function setParts(p, products = []) {
+  return parseParts(p.parts)
+    .map((x) => ({ p: products.find((q) => q.id === x.id && !isSet(q)), qty: x.qty }))
+    .filter((x) => x.p && x.qty > 0);
+}
+
+// ご飯の量が入っているか。セットは中身の単品が全部入っていれば入っている
+export function hasRice(p, products = []) {
+  if (!isSet(p)) return num(p.riceRawG) != null || num(p.cookedG) != null;
+  const parts = setParts(p, products);
+  return parts.length > 0 && parts.every((x) => hasRice(x.p));
+}
+
+// セットを1単位の計算用にほどく：お米・資材は中身の単品の合計＋セット自身の資材、
+// 米チャレの売上は中身の単品の値段の合計（セットの値段が上限）
+export function expandSet(p, products = [], cookRatio = DEFAULT_COOK_RATIO) {
+  if (!isSet(p)) return { ...p, komePrice: num(p.price) || 0, onigiri: 1 };
+  const parts = setParts(p, products);
+  const materials = [
+    ...parseMaterials(p.materials),
+    ...parts.flatMap((x) => parseMaterials(x.p.materials).map((m) => ({ ...m, amount: (num(m.amount) || 0) * x.qty }))),
+  ];
+  return {
+    ...p,
+    cookedG: '',
+    riceRawG: parts.length ? sum(parts.map((x) => riceG(x.p, cookRatio) * x.qty)) : '',
+    materials,
+    komePrice: Math.min(num(p.price) || 0, sum(parts.map((x) => (num(x.p.price) || 0) * x.qty))),
+    onigiri: sum(parts.map((x) => x.qty)),
+  };
+}
+
 export function riceG(p, cookRatio = DEFAULT_COOK_RATIO) {
   const raw = num(p.riceRawG);
   if (raw != null) return raw;
@@ -76,7 +117,9 @@ export function riceG(p, cookRatio = DEFAULT_COOK_RATIO) {
 }
 
 // お米の原価は年度原価で回収する扱いなので、変動費には入れない
-export function unitEconomics(p, { costPerKg = 0, totalCost = 0, cookRatio = DEFAULT_COOK_RATIO } = {}) {
+// ctx.products があれば、セットは中身の単品から計算する
+export function unitEconomics(item, { costPerKg = 0, totalCost = 0, cookRatio = DEFAULT_COOK_RATIO, products = [] } = {}) {
+  const p = expandSet(item, products, cookRatio);
   const price = num(p.price) || 0;
   const shipping = num(p.shipping) || 0;
   const pays = price + (bool(p.customerPaysShipping) ? shipping : 0);
@@ -85,8 +128,8 @@ export function unitEconomics(p, { costPerKg = 0, totalCost = 0, cookRatio = DEF
   const fee = feeRate || feeFixed ? pays * feeRate + feeFixed : 0;
   const materials = sum(parseMaterials(p.materials).map((m) => num(m.amount) || 0));
   const variable = materials + shipping + fee;
-  // セット商品（おにぎり＋豚汁など）の米チャレ以外の分は、米チャレの売上に入れない
-  const setOther = num(p.setOther) || 0;
+  // セット（おにぎり＋豚汁など）のおにぎり以外の分は、米チャレの売上に入れない
+  const setOther = price - p.komePrice;
   const keep = pays - setOther - variable;
   const g = riceG(p, cookRatio);
   const riceCost = (g / 1000) * costPerKg;
@@ -120,10 +163,27 @@ export function yearOfDate(date, harvests = []) {
   return String(date).slice(5) < hs[0].harvestDate.slice(5) ? cal - 1 : cal;
 }
 
-// 米チャレの売上：セット商品は、商品の setOther（1個あたり）×数量を引く
+// 米チャレの売上：セットは「中身の単品の値段の合計 ÷ セットの値段」の割合だけ数える（値引きにも比例）
 export function komeAmount(s, products = []) {
+  const amount = num(s.amount) || 0;
   const p = products.find((x) => x.id === s.productId);
-  return Math.max(0, (num(s.amount) || 0) - (num(p?.setOther) || 0) * (num(s.qty) || 0));
+  if (!isSet(p)) return amount;
+  const price = num(p.price) || 0;
+  return price > 0 ? amount * (expandSet(p, products).komePrice / price) : 0;
+}
+
+// おにぎり（単品）ごとの販売数。セットの中身も数える → Map(単品id → 個数)
+export function onigiriCounts(sales, products = []) {
+  const m = new Map();
+  const add = (id, n) => m.set(id, (m.get(id) || 0) + n);
+  for (const s of sales) {
+    const p = products.find((x) => x.id === s.productId);
+    const qty = num(s.qty) || 0;
+    if (!p) continue;
+    if (isSet(p)) setParts(p, products).forEach((x) => add(x.p.id, x.qty * qty));
+    else add(p.id, qty);
+  }
+  return m;
 }
 
 export const saleKeep = (s, products = []) => komeAmount(s, products) - (num(s.variableCostAtSale) || 0) * (num(s.qty) || 0);
@@ -147,7 +207,7 @@ export function yearContext(fin, year) {
   const kg = harvestKg(harvest);
   const cost = yearCost({ costs: fin.costs, assets: fin.assets, year });
   const costPerKg = kg.hakumaiKg ? cost.total / kg.hakumaiKg : 0;
-  return { year, cookRatio, harvest, kg, cost, costPerKg, totalCost: cost.total };
+  return { year, cookRatio, harvest, kg, cost, costPerKg, totalCost: cost.total, products: fin.products || [] };
 }
 
 /* ---------- 表示 ---------- */

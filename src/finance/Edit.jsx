@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { uid } from '../config';
 import { ConfirmButton } from '../components/Dialogs';
-import { bool, costAmount, depreciation, harvestKg, kgf, num, parseMaterials, pct, riceG, unitEconomics, yen, yen1 } from './calc';
-import { CHANNELS, hasRice } from './store';
+import { bool, costAmount, depreciation, expandSet, harvestKg, hasRice, isSet, kgf, num, parseMaterials, parseParts, pct, riceG, setParts, unitEconomics, yen, yen1 } from './calc';
+import { CHANNELS } from './store';
 
 const COST_CATEGORIES = ['種', '肥料', '農薬', '燃料', 'もみすり', '精米', '資材', '出店料', '人件費', 'その他'];
 
@@ -228,7 +228,7 @@ export function UnitBox({ u }) {
   return (
     <dl className="fin-unit">
       <dt>お客さまの支払い</dt><dd>{yen1(u.pays)}</dd>
-      {u.setOther ? <><dt>セットの米チャレ以外の分</dt><dd>−{yen1(u.setOther)}</dd></> : null}
+      {u.setOther ? <><dt>セットのおにぎり以外の分</dt><dd>−{yen1(u.setOther)}</dd></> : null}
       <dt>変動費（資材＋送料＋手数料）</dt><dd>{yen1(u.variable)}{u.fee ? <small>手数料 {yen1(u.fee)}</small> : null}</dd>
       <dt>手残り</dt><dd><b>{yen1(u.keep)}</b></dd>
       <dt>お米の原価（生米 {Math.round(u.riceG * 10) / 10}g）</dt><dd>{yen1(u.riceCost)}</dd>
@@ -238,7 +238,13 @@ export function UnitBox({ u }) {
   );
 }
 
-// lockPrice: カモの小屋の商品は値段をカモの小屋で変える
+function PriceField({ f, set, lockPrice }) {
+  return lockPrice
+    ? <div className="field"><span className="lab">値段</span><p className="locked">{yen(num(f.price))}<small>カモの小屋で変更</small></p></div>
+    : <Num id="p-price" label="値段" unit="円" value={f.price} onChange={set('price')} />;
+}
+
+// 単品の入力（価格試算でも使う）。lockPrice: カモの小屋の商品は値段をカモの小屋で変える
 export function ProductFields({ f, set, ctx, lockPrice = false }) {
   return (
     <>
@@ -247,17 +253,13 @@ export function ProductFields({ f, set, ctx, lockPrice = false }) {
           <select id="p-ch" value={f.channel} onChange={(e) => set('channel')(e.target.value)}>
             {Object.entries(CHANNELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select></div>
-        {lockPrice
-          ? <div className="field"><span className="lab">値段</span><p className="locked">{yen(num(f.price))}<small>カモの小屋で変更</small></p></div>
-          : <Num id="p-price" label="値段" unit="円" value={f.price} onChange={set('price')} />}
+        <PriceField f={f} set={set} lockPrice={lockPrice} />
       </div>
       <div className="row2">
         <Num id="p-cooked" label="炊いた重さ" unit="g" value={f.cookedG} onChange={set('cookedG')} />
         <Num id="p-raw" label="生米（白米）" unit="g" value={f.riceRawG} onChange={set('riceRawG')}
           placeholder={num(f.cookedG) != null ? `自動：${Math.round(riceG(f, ctx.cookRatio) * 10) / 10}` : ''} />
       </div>
-      <Num id="p-other" label="セット商品：米チャレ以外の分（1個あたり）" unit="円" value={f.setOther} onChange={set('setOther')}
-        placeholder="例：おにぎり豚汁セットなら豚汁の分" />
       <MaterialsEditor value={f.materials} onChange={set('materials')} />
       <div className="row3">
         <Num id="p-ship" label="送料" unit="円" value={f.shipping} onChange={set('shipping')} />
@@ -272,17 +274,48 @@ export function ProductFields({ f, set, ctx, lockPrice = false }) {
   );
 }
 
+// セットの中身：どの単品を何個
+function PartsEditor({ value, onChange, singles }) {
+  const list = parseParts(value);
+  const put = (next) => onChange(JSON.stringify(next));
+  return (
+    <div className="field"><span className="lab">中身のおにぎり（単品）</span>
+      {list.map((x, i) => (
+        <div className="mat" key={i}>
+          <select aria-label="単品" value={x.id} onChange={(e) => put(list.map((y, j) => (j === i ? { ...y, id: e.target.value } : y)))}>
+            {!singles.some((p) => p.id === x.id) && <option value={x.id}>（見つからない商品）</option>}
+            {singles.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          <div className="num">
+            <input type="number" inputMode="numeric" min="1" step="1" aria-label="個数" value={x.qty || ''} onChange={(e) => put(list.map((y, j) => (j === i ? { ...y, qty: e.target.value === '' ? '' : Number(e.target.value) } : y)))} />
+            <span>個</span>
+          </div>
+          <button type="button" className="x" aria-label="この行を消す" onClick={() => put(list.filter((_, j) => j !== i))}>×</button>
+        </div>
+      ))}
+      {singles.length
+        ? <button type="button" className="btn small" onClick={() => put([...list, { id: singles[0].id, qty: 1 }])}>＋ おにぎりを足す</button>
+        : <p className="note">先に単品を登録してください</p>}
+    </div>
+  );
+}
+
 const toForm = (p) => ({
-  name: s(p?.name), channel: p?.channel || 'event', price: s(p?.price), cookedG: s(p?.cookedG), riceRawG: s(p?.riceRawG),
+  name: s(p?.name), kind: isSet(p) ? 'set' : 'single', parts: p?.parts || '[]',
+  channel: p?.channel || 'event', price: s(p?.price), cookedG: s(p?.cookedG), riceRawG: s(p?.riceRawG),
   materials: p?.materials || '[]', shipping: s(p?.shipping), customerPaysShipping: bool(p?.customerPaysShipping),
-  feeRate: s(p?.feeRate), feeFixed: s(p?.feeFixed), setOther: s(p?.setOther), kamoProductId: s(p?.kamoProductId), active: p ? bool(p.active) : true,
+  feeRate: s(p?.feeRate), feeFixed: s(p?.feeFixed), kamoProductId: s(p?.kamoProductId), active: p ? bool(p.active) : true,
 });
+
+const KINDS = { single: '単品', set: 'セット' };
 
 function ProductForm({ row, ctx, onSave, onCancel }) {
   const [f, setF] = useState(() => toForm(row));
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
   const u = unitEconomics(f, ctx);
   const kamo = !!f.kamoProductId;
+  const singles = ctx.products.filter((p) => !isSet(p) && p.id !== row?.id);
+  const ex = expandSet(f, ctx.products, ctx.cookRatio);
   return (
     <form className="fin-form" onSubmit={(e) => { e.preventDefault(); if (f.name.trim()) onSave({ id: row?.id || uid('p'), ...f, name: f.name.trim() }); }}>
       {kamo ? (
@@ -291,8 +324,30 @@ function ProductForm({ row, ctx, onSave, onCancel }) {
         <div className="field"><label htmlFor="p-name">名前</label>
           <input type="text" id="p-name" required value={f.name} onChange={(e) => set('name')(e.target.value)} placeholder="例：焼きおにぎり（醤油）" /></div>
       )}
-      {kamo && !hasRice(f) && <p className="note">炊いた重さか生米のg数を入れると、取り込んだ売上の米の量と原価が出ます</p>}
-      <ProductFields f={f} set={set} ctx={ctx} lockPrice={kamo} />
+      <div className="field"><span className="lab">種類</span>
+        <div className="pick">
+          {Object.entries(KINDS).map(([k, v]) => (
+            <label key={k} className={f.kind === k ? 'on' : ''}>
+              <input type="radio" name="p-kind" checked={f.kind === k} onChange={() => set('kind')(k)} />
+              <span>{v}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+      {f.kind === 'set' ? (
+        <>
+          <PriceField f={f} set={set} lockPrice={kamo} />
+          <PartsEditor value={f.parts} onChange={set('parts')} singles={singles} />
+          {ex.onigiri > 0 && (
+            <p className="note">おにぎり {ex.onigiri}個・生米 {Math.round(num(ex.riceRawG) * 10) / 10}g。米チャレの売上は1セット {yen(ex.komePrice)}（中身の単品の値段の合計）で数えます</p>
+          )}
+        </>
+      ) : (
+        <>
+          {!hasRice(f) && <p className="note">炊いた重さか生米のg数を入れると、売上から使ったお米の量と原価が出ます</p>}
+          <ProductFields f={f} set={set} ctx={ctx} lockPrice={kamo} />
+        </>
+      )}
       {!kamo && (
         <label className="check"><input type="checkbox" checked={f.active} onChange={(e) => set('active')(e.target.checked)} />販売中（外すと一覧や売上の入力に出なくなります）</label>
       )}
@@ -305,32 +360,48 @@ function ProductForm({ row, ctx, onSave, onCancel }) {
   );
 }
 
+function productNote(p, products) {
+  if (!isSet(p)) {
+    return hasRice(p) ? `生米 ${Math.round(riceG(p) * 10) / 10}g` : <b className="warn">ご飯の量が未入力</b>;
+  }
+  const parts = setParts(p, products);
+  return parts.length ? parts.map((x) => `${x.p.name}×${x.qty}`).join('・') : <b className="warn">中身が未入力</b>;
+}
+
 export function ProductsTab({ fin, ctx, api }) {
   const [edit, setEdit] = useState(null);
   const done = (r, msg) => api.save('products', r, msg).then((ok) => ok && setEdit(null));
+  const row = (p) => {
+    if (edit?.id === p.id) return <li key={p.id} className="form"><ProductForm row={p} ctx={ctx} onCancel={() => setEdit(null)} onSave={(r) => done(r)} /></li>;
+    const u = unitEconomics(p, ctx);
+    return (
+      <li key={p.id} className={bool(p.active) ? '' : 'off'}>
+        <button className="row" onClick={() => setEdit(p)}>
+          <span className="t">{p.name}<small>{yen(num(p.price))}・{productNote(p, fin.products)}{bool(p.active) ? '' : '・販売していない'}</small></span>
+          <span className="n">手残り {yen1(u.keep)}<small>分岐 {u.breakEven != null ? `${u.breakEven.toLocaleString()}個` : '–'}</small></span>
+        </button>
+        {/* カモの小屋の商品は消しても次の取り込みでまたできるので、消せなくする */}
+        {!p.kamoProductId && <ConfirmButton className="x" confirmText="消す？" onConfirm={() => api.remove('products', p.id)}>×</ConfirmButton>}
+      </li>
+    );
+  };
+  const singles = fin.products.filter((p) => !isSet(p));
+  const sets = fin.products.filter(isSet);
   return (
     <>
       {!ctx.costPerKg && <p className="note">「収穫」と「原価」を入れると、お米の原価と損益分岐が出ます。</p>}
-      <p className="note">カモの小屋で komechalle にチェックした商品は、取り込むと自動でここに入ります。ご飯の量と資材だけ入れてください。カモの小屋にない商品は「＋ 商品を追加」で作れます。</p>
-      <ul className="fin-list">
-        {fin.products.map((p) => {
-          if (edit?.id === p.id) return <li key={p.id} className="form"><ProductForm row={p} ctx={ctx} onCancel={() => setEdit(null)} onSave={(r) => done(r)} /></li>;
-          const u = unitEconomics(p, ctx);
-          return (
-            <li key={p.id} className={bool(p.active) ? '' : 'off'}>
-              <button className="row" onClick={() => setEdit(p)}>
-                <span className="t">{p.name}<small>{CHANNELS[p.channel] || ''}・{yen(num(p.price))}{p.kamoProductId ? '・カモの小屋' : ''}{bool(p.active) ? '' : '・販売していない'}{hasRice(p) ? '' : <b className="warn">・ご飯の量が未入力</b>}</small></span>
-                <span className="n">手残り {yen1(u.keep)}<small>分岐 {u.breakEven != null ? `${u.breakEven.toLocaleString()}個` : '–'}</small></span>
-              </button>
-              {/* カモの小屋の商品は消しても次の取り込みでまたできるので、消せなくする */}
-              {!p.kamoProductId && <ConfirmButton className="x" confirmText="消す？" onConfirm={() => api.remove('products', p.id)}>×</ConfirmButton>}
-            </li>
-          );
-        })}
-      </ul>
+      <p className="note">カモの小屋で米チャレにした商品は、取り込むと自動でここに入ります。単品にはご飯の量、セットには中身のおにぎりを入れてください。</p>
+      <h3>単品</h3>
+      <ul className="fin-list">{singles.map(row)}</ul>
+      <h3>セット</h3>
+      {sets.length ? <ul className="fin-list">{sets.map(row)}</ul> : <p className="note">セットはまだありません</p>}
       {edit && !edit.id
         ? <ProductForm ctx={ctx} onCancel={() => setEdit(null)} onSave={(r) => done(r, '商品を追加しました')} />
         : <button className="btn" onClick={() => setEdit({})}>＋ 商品を追加</button>}
+      <div className="fin-since">
+        <button className="btn small" onClick={api.recalc}>取り込んだ売上を、今の商品の設定で計算し直す</button>
+        <small>ご飯の量やセットの中身をあとから直したときに押します</small>
+      </div>
     </>
   );
 }
