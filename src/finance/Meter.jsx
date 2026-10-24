@@ -89,66 +89,148 @@ function Tractor({ uid, smoke }) {
   );
 }
 
+// 毛並み：楕円のふちから外へ短い線を並べる（毎回同じ形になるよう乱数は使わない）
+function tufts(cx, cy, rx, ry, from, to, n, len) {
+  let d = '';
+  for (let i = 0; i <= n; i++) {
+    const a = ((from + ((to - from) * i) / n) * Math.PI) / 180;
+    const wob = ((i * 37) % 7) / 7 - 0.5;
+    const x = cx + rx * Math.cos(a);
+    const y = cy + ry * Math.sin(a);
+    const b = a + wob * 0.5;
+    const l = len * (0.7 + (((i * 53) % 5) / 5) * 0.6);
+    d += `M${x.toFixed(1)} ${y.toFixed(1)} l${(l * Math.cos(b)).toFixed(1)} ${(l * Math.sin(b)).toFixed(1)} `;
+  }
+  return d;
+}
+
+// 指：(x, y) から角度 deg へ長さ len の指を n 本、間隔 gap で並べる
+function Fingers({ x, y, deg, len, n = 4, gap = 6.5, dx = 0, dy = 1 }) {
+  const a = (deg * Math.PI) / 180;
+  return (
+    <g strokeLinecap="round">
+      {Array.from({ length: n }, (_, i) => {
+        const sx = x + dx * gap * i;
+        const sy = y + dy * gap * i;
+        const ex = sx + len * Math.cos(a);
+        const ey = sy + len * Math.sin(a);
+        return (
+          <g key={i}>
+            <line x1={sx} y1={sy} x2={ex} y2={ey} stroke="#121110" strokeWidth="7.5" />
+            <line x1={sx} y1={sy} x2={ex} y2={ey} stroke="#2E2B29" strokeWidth="6" />
+            <circle cx={ex} cy={ey} r="2.4" fill="#4C4642" />
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
 // 黄色いサングラスのゴリラ（胸から上）。happy: ジョッキを持ってニヤリ / そうでなければ頭を抱えて「オーマイガー」
 function Gorilla({ uid, happy, children }) {
-  const FUR = '#252525';
-  const SKIN = '#3E3E3E';
-  const ARM = '#323232';
+  const g = (k) => `url(#${uid}${k})`;
   return (
     <g className={happy ? 'fm-gorilla happy' : 'fm-gorilla'}>
       <defs>
-        <linearGradient id={`${uid}lens`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#FFE07A" />
-          <stop offset="1" stopColor="#F08A1C" />
+        <radialGradient id={`${uid}body`} cx=".5" cy=".3" r=".75">
+          <stop offset="0" stopColor="#403E3C" /><stop offset=".6" stopColor="#242322" /><stop offset="1" stopColor="#121212" />
+        </radialGradient>
+        <radialGradient id={`${uid}head`} cx=".5" cy=".25" r=".8">
+          <stop offset="0" stopColor="#4A433D" /><stop offset=".5" stopColor="#262422" /><stop offset="1" stopColor="#141313" />
+        </radialGradient>
+        <radialGradient id={`${uid}skin`} cx=".5" cy=".55" r=".65">
+          <stop offset="0" stopColor="#5C5650" /><stop offset=".7" stopColor="#3B3734" /><stop offset="1" stopColor="#272422" />
+        </radialGradient>
+        <radialGradient id={`${uid}muzzle`} cx=".5" cy=".35" r=".7">
+          <stop offset="0" stopColor="#6A635C" /><stop offset="1" stopColor="#3A3532" />
+        </radialGradient>
+        <linearGradient id={`${uid}arm`} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#1A1918" /><stop offset=".5" stopColor="#363432" /><stop offset="1" stopColor="#1A1918" />
         </linearGradient>
+        <linearGradient id={`${uid}lens`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#FFE58A" /><stop offset=".55" stopColor="#F7B232" /><stop offset="1" stopColor="#E0761A" />
+        </linearGradient>
+        <radialGradient id={`${uid}mouth`} cx=".5" cy=".6" r=".6">
+          <stop offset="0" stopColor="#5A1414" /><stop offset="1" stopColor="#1E0606" />
+        </radialGradient>
       </defs>
-      {/* 胴体 */}
-      <path d="M248 222 Q250 158 284 142 Q318 130 352 142 Q386 158 388 222 Z" fill={FUR} />
-      <ellipse cx="302" cy="170" rx="20" ry="15" fill="#333" />
-      <ellipse cx="334" cy="170" rx="20" ry="15" fill="#333" />
-      {/* 頭 */}
-      <path d="M288 124 Q282 92 294 70 Q318 40 342 70 Q354 92 348 124 Q318 140 288 124 Z" fill={FUR} />
-      <path d="M298 66 Q318 46 338 66 Q326 58 318 58 Q308 58 298 66 Z" fill="#5A4636" opacity=".8" />
-      <path d="M296 88 Q318 80 340 88 Q348 108 338 124 Q318 134 298 124 Q288 108 296 88 Z" fill={SKIN} />
-      <path d="M294 88 Q318 78 342 88" stroke="#161616" strokeWidth="5" fill="none" strokeLinecap="round" />
+
+      {/* 胴体と胸 */}
+      <path d="M244 222 C246 172 266 146 296 138 C310 134 326 134 340 138 C370 146 390 172 392 222 Z" fill={g('body')} />
+      <path d="M252 190 C262 158 284 144 304 140 M384 190 C374 158 352 144 332 140" stroke="#5A5652" strokeWidth="1.6" fill="none" opacity=".45" />
+      <ellipse cx="300" cy="176" rx="17" ry="12" fill="#343230" opacity=".7" />
+      <ellipse cx="336" cy="176" rx="17" ry="12" fill="#343230" opacity=".7" />
+
+      {/* 頭（高い頭頂） */}
+      <path d="M284 120 C278 96 282 72 296 58 C307 46 329 46 340 58 C354 72 358 96 352 120 C342 138 294 138 284 120 Z" fill={g('head')} />
+      <path d={tufts(318, 92, 34, 44, 205, 335, 44, 2.6)} stroke="#4E4740" strokeWidth="1.1" opacity=".6" />
+      <path d="M300 58 C310 50 326 50 336 58" stroke="#7A6250" strokeWidth="2" fill="none" opacity=".55" />
+      {/* 耳 */}
+      <ellipse cx="285" cy="100" rx="5" ry="8" fill="#3A3633" stroke="#1A1918" strokeWidth="1" />
+      <ellipse cx="351" cy="100" rx="5" ry="8" fill="#3A3633" stroke="#1A1918" strokeWidth="1" />
+
+      {/* 顔 */}
+      <path d="M293 84 C304 77 332 77 343 84 C351 100 349 116 341 128 C331 140 305 140 295 128 C287 116 285 100 293 84 Z" fill={g('skin')} />
+      {!happy && <ellipse cx="318" cy="139" rx="17" ry="7" fill="#3A3532" />}
+      <path d="M300 106 C306 99 330 99 336 106 C343 116 339 130 318 134 C297 130 293 116 300 106 Z" fill={g('muzzle')} />
+      {/* 眉の張り出し */}
+      <path d="M289 87 C300 75 336 75 347 87 C341 92 295 92 289 87 Z" fill="#191716" />
+      <path d="M295 81 C307 75 329 75 341 81" stroke="#6F6862" strokeWidth="1.4" fill="none" opacity=".6" />
+      {/* 鼻すじと頬のしわ */}
+      <path d="M314 98 Q318 96 322 98 M313 101 Q318 99 323 101" stroke="#24211F" strokeWidth="1.1" fill="none" />
+      <path d="M299 109 Q302 117 300 125 M337 109 Q334 117 336 125" stroke="#2A2725" strokeWidth="1.3" fill="none" opacity=".8" />
+
       {/* サングラス */}
-      <g stroke="#B88A1A" strokeWidth="1.6" strokeLinejoin="round">
-        <path d="M294 89 L288 87 M342 89 L348 87" fill="none" />
-        <path d="M294 88 H315 Q316 99 305 102 Q294 101 294 88 Z" fill={`url(#${uid}lens)`} />
-        <path d="M321 88 H342 Q342 101 331 102 Q320 99 321 88 Z" fill={`url(#${uid}lens)`} />
-        <path d="M315 90 Q318 87 321 90" fill="none" />
+      <g strokeLinejoin="round">
+        <path d="M295 88 L286 91 M341 88 L350 91" stroke="#B88A1A" strokeWidth="2" />
+        <path d="M295 88 C300 86 311 86 316 88 C317 99 312 105 305 105 C298 105 293 98 295 88 Z" fill={g('lens')} stroke="#C2931C" strokeWidth="1.8" />
+        <path d="M341 88 C336 86 325 86 320 88 C319 99 324 105 331 105 C338 105 343 98 341 88 Z" fill={g('lens')} stroke="#C2931C" strokeWidth="1.8" />
+        <path d="M296 87 C306 84.5 330 84.5 340 87 M316 91 Q318 89 320 91" stroke="#C2931C" strokeWidth="1.8" fill="none" />
+        <path d="M299 90 L306 90 L300 99 Z M324 90 L331 90 L325 99 Z" fill="#FFFBEA" opacity=".55" />
       </g>
-      <path d="M298 91 l5 0 M324 91 l5 0" stroke="#FFF7D6" strokeWidth="1.6" strokeLinecap="round" opacity=".9" />
+
       {/* 鼻 */}
-      <path d="M309 108 Q318 101 327 108 Q326 114 318 114 Q310 114 309 108 Z" fill="#2B2B2B" />
-      <ellipse cx="314" cy="110" rx="2.4" ry="1.6" fill="#0E0E0E" />
-      <ellipse cx="322" cy="110" rx="2.4" ry="1.6" fill="#0E0E0E" />
+      <path d="M307 106 C310 101 326 101 329 106 C332 112 326 116 318 116 C310 116 304 112 307 106 Z" fill="#2A2624" />
+      <path d="M310 111 C311 107 316 108 316 111 C315 113 311 113 310 111 Z M326 111 C325 107 320 108 320 111 C321 113 325 113 326 111 Z" fill="#0D0C0B" />
+      <path d="M310 104 Q318 101 326 104" stroke="#5F5852" strokeWidth="1" fill="none" opacity=".7" />
+
       {happy ? (
-        <path d="M306 120 Q318 125 332 117" stroke="#121212" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+        <>
+          {/* ニヤリ */}
+          <path d="M305 122 Q316 127 331 119" stroke="#121110" strokeWidth="2.6" fill="none" strokeLinecap="round" />
+          <path d="M331 119 q3 -1 4 -4" stroke="#121110" strokeWidth="1.8" fill="none" strokeLinecap="round" />
+          <path d="M310 128 Q318 130 326 127" stroke="#6A635C" strokeWidth="1.2" fill="none" opacity=".7" />
+        </>
       ) : (
         <>
-          <path d="M305 117 Q318 113 331 117 Q334 132 318 136 Q302 132 305 117 Z" fill="#5E1919" stroke="#121212" strokeWidth="1.5" />
-          <path d="M307 118 H329 L327 121 H309 Z" fill="#F6F1E6" />
-          <path d="M309 133 Q318 135 327 133 L325 130 H311 Z" fill="#F6F1E6" />
-          <ellipse cx="318" cy="129" rx="7" ry="3" fill="#C9504F" />
+          {/* 大口を開けて叫ぶ */}
+          <path d="M301 117 C309 112 327 112 335 117 C338 130 331 143 318 144 C305 143 298 130 301 117 Z" fill={g('mouth')} stroke="#121110" strokeWidth="1.6" />
+          <path d="M303 118 C311 115 325 115 333 118 L332 122 C325 120 311 120 304 122 Z" fill="#EFE8DA" />
+          <path d="M305 120 L308.5 128 L311 120 Z M325 120 L327.5 128 L331 120 Z" fill="#F6F1E6" stroke="#B9B2A5" strokeWidth=".6" />
+          <path d="M308 140 C314 142 322 142 328 140 L326 137 H310 Z" fill="#EFE8DA" />
+          <ellipse cx="318" cy="136" rx="8" ry="3.5" fill="#C9504F" />
         </>
       )}
+
       {happy ? (
         <>
-          {/* ジョッキを持つ右腕 */}
-          <path d="M380 222 Q388 172 360 150" stroke={ARM} strokeWidth="24" fill="none" strokeLinecap="round" />
+          {/* ジョッキを持つ右腕と手 */}
+          <path d="M366 222 C392 196 390 160 376 142 L360 148 C370 166 368 194 344 222 Z" fill={g('arm')} />
+          <path d="M386 196 C390 174 386 156 378 146" stroke="#5A5652" strokeWidth="1.4" fill="none" opacity=".5" />
           {children}
-          <ellipse cx="347" cy="142" rx="9" ry="12" fill="#2C2C2C" />
-          <path d="M345 133 h10 M345 140 h11 M345 147 h10" stroke="#1A1A1A" strokeWidth="1.5" strokeLinecap="round" />
+          <ellipse cx="380" cy="134" rx="9" ry="13" fill="#262422" />
+          <Fingers x={382} y={123} deg={172} len={15} n={4} gap={6.8} />
         </>
       ) : (
         <>
           {/* 両手で頭を抱える */}
-          <path d="M262 214 Q256 150 286 86" stroke={ARM} strokeWidth="22" fill="none" strokeLinecap="round" />
-          <path d="M374 214 Q380 150 350 86" stroke={ARM} strokeWidth="22" fill="none" strokeLinecap="round" />
-          <ellipse cx="293" cy="74" rx="13" ry="11" fill="#2C2C2C" transform="rotate(-30 293 74)" />
-          <ellipse cx="343" cy="74" rx="13" ry="11" fill="#2C2C2C" transform="rotate(30 343 74)" />
-          <path d="M290 66 l6 8 M296 63 l5 8 M346 66 l-6 8 M340 63 l-5 8" stroke="#1A1A1A" strokeWidth="1.5" strokeLinecap="round" />
+          <path d="M248 222 C242 178 254 128 278 86 L296 94 C280 132 274 178 278 222 Z" fill={g('arm')} />
+          <path d="M388 222 C394 178 382 128 358 86 L340 94 C356 132 362 178 358 222 Z" fill={g('arm')} />
+          <path d="M250 200 C248 166 258 126 278 90 M386 200 C388 166 378 126 358 90" stroke="#5A5652" strokeWidth="1.4" fill="none" opacity=".5" />
+          <ellipse cx="290" cy="80" rx="12" ry="14" fill="#262422" transform="rotate(-25 290 80)" />
+          <ellipse cx="346" cy="80" rx="12" ry="14" fill="#262422" transform="rotate(25 346 80)" />
+          <Fingers x={284} y={78} deg={-72} len={13} n={4} gap={5.6} dx={1} dy={-0.55} />
+          <Fingers x={352} y={78} deg={-108} len={13} n={4} gap={5.6} dx={-1} dy={-0.55} />
           {children}
         </>
       )}
