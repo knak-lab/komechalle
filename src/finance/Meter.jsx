@@ -63,7 +63,7 @@ export default function Meter({ totalCost, keep }) {
   const go = GORILLA[happy ? 'happy' : 'sad'];
   const ts = 0.39; // トラクターの縮尺
   const gs = 210 / go.h; // ゴリラは高さ210にそろえる
-  const gx = 516 - go.w * gs;
+  const gx = 478 - go.w * gs; // 右下はたまったジョッキの場所
 
   return (
     <figure className="fin-meter">
@@ -80,8 +80,8 @@ export default function Meter({ totalCost, keep }) {
           {happy
             ? <circle cx="24" cy="26" r="12" fill="#FFD45A" />
             : <path d="M10 34 a9 9 0 0 1 12-10 a11 11 0 0 1 20 2 a8 8 0 0 1 2 15 h-30 a7 7 0 0 1-4-7z" fill="#fff" opacity=".85" />}
-          <rect y="196" width="520" height="34" fill="#8DBF6A" />
-          <rect y="196" width="520" height="4" fill="#79AA57" />
+          <rect y="136" width="520" height="94" fill="#8DBF6A" />
+          <rect y="136" width="520" height="4" fill="#79AA57" />
 
           {/* トラクターと燃料タンク（タンクの中＝原価回収メーター） */}
           <g transform={`translate(6 16) scale(${ts})`}>
@@ -109,12 +109,12 @@ export default function Meter({ totalCost, keep }) {
 
           {/* たまったジョッキ */}
           {full > 0 && full <= 6 && Array.from({ length: full }, (_, i) => (
-            <Jug key={i} id={`${uid}j${i}`} x={200 + (i % 2) * 19} y={202 - Math.floor(i / 2) * 23} w={13} h={19} />
+            <Jug key={i} id={`${uid}j${i}`} x={482 + (i % 2) * 18} y={204 - Math.floor(i / 2) * 23} w={13} h={19} />
           ))}
           {full > 6 && (
             <>
-              <Jug id={`${uid}jn`} x={204} y={168} w={18} h={25} />
-              <text x="214" y="214" textAnchor="middle" className="fm-count">×{full}</text>
+              <Jug id={`${uid}jn`} x={486} y={170} w={18} h={25} />
+              <text x="497" y="214" textAnchor="middle" className="fm-count">×{full}</text>
             </>
           )}
         </g>
