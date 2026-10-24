@@ -279,6 +279,8 @@ function finSyncKamoProducts_(kamoProducts) {
     const kid = String(k.id);
     const sync = { name: String(k.name), price: toCell_(k.price), active: toCell_(k.active !== false) };
     const p = products.find((x) => x.kamoProductId === kid);
+    // 種類が空（単品・セットに分ける前に作った商品）なら名前から見当をつける
+    if (p && !p.kind) sync.kind = finGuessKind_(k.name);
     if (!p) {
       appendObj_(sh, P.cols, Object.assign({ id: 'kamo:' + kid, channel: 'store', kind: finGuessKind_(k.name), parts: '[]', materials: '[]', customerPaysShipping: 'false', kamoProductId: kid }, sync));
       created++;

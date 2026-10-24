@@ -43,7 +43,7 @@ export function applyKamoProducts(fin, kamoProducts) {
     const sync = { name: k.name, price: k.price, active: k.active !== false };
     const i = products.findIndex((p) => p.kamoProductId === k.id);
     products = i >= 0
-      ? products.map((p, j) => (j === i ? { ...p, ...sync } : p))
+      ? products.map((p, j) => (j === i ? { ...p, ...sync, kind: p.kind || guessKind(k.name) } : p))
       : [...products, {
         id: 'kamo:' + k.id, channel: 'store', kind: guessKind(k.name), parts: '[]', cookedG: '', riceRawG: '', materials: '[]', shipping: '', customerPaysShipping: false,
         feeRate: '', feeFixed: '', kamoProductId: k.id, ...sync,
