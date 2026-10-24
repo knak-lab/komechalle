@@ -278,6 +278,19 @@ ul.cal-list .c{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nu
 .fin-progress span{display:block;height:100%;background:var(--straw);border-radius:99px;transition:width .4s}
 .fin-progress span.done{background:var(--accent)}
 .fin-big{margin:8px 0 0;font-size:15px}
+.fin-meter{margin:0 0 12px}
+.fin-meter svg{display:block;width:100%;height:auto;max-width:520px;margin:0 auto}
+.fin-meter figcaption{text-align:center;font-size:14px;margin-top:6px}
+.fin-meter figcaption b{font-family:var(--f-display);font-size:18px;font-variant-numeric:tabular-nums}
+.fm-fill{transform-box:fill-box;transform-origin:50% 100%;transition:transform .8s ease-out}
+.fm-pct{font:700 13px var(--f-display);fill:#1E261C}
+.fm-cap{font:700 11px var(--f-body);fill:#1E261C}
+.fm-count{font:700 15px var(--f-display);fill:#1E261C}
+.fm-gorilla.happy{animation:fm-bob 1.6s ease-in-out infinite;transform-box:fill-box;transform-origin:50% 100%}
+.fm-smoke{animation:fm-puff 2s ease-in-out infinite}
+@keyframes fm-bob{50%{transform:translateY(-3px)}}
+@keyframes fm-puff{50%{opacity:.4;transform:translateY(-3px)}}
+@media (prefers-reduced-motion: reduce){.fm-gorilla.happy,.fm-smoke{animation:none}.fm-fill{transition:none}}
 .fin-big b{font-family:var(--f-display);font-size:22px;font-variant-numeric:tabular-nums}
 .fin-scroll{overflow-x:auto;margin:0 -4px;padding:0 4px}
 table.fin-table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { finCall } from '../api';
 import { uid } from '../config';
 import { bool, kgf, komeAmount, num, onigiriCounts, pct, saleKeep, salesSummary, unitEconomics, yearContext, yearOfDate, yen, yen1 } from './calc';
+import Meter from './Meter';
 import { CHANNELS, applyDelete, applyLink, applySave, emptyFin, fillKamoSales } from './store';
 import { CostsTab, HarvestTab, ProductsTab } from './Edit';
 import PricingTab from './Pricing';
@@ -169,6 +170,7 @@ function SummaryTab({ fin, ctx, year, events }) {
 
   return (
     <>
+      <Meter totalCost={ctx.totalCost} keep={sum.keep} />
       <div className="stats">
         <div className="stat"><b>{yen(ctx.totalCost)}</b><span>{year}年度の原価</span></div>
         <div className="stat"><b>{kgf(ctx.kg.hakumaiKg)}</b><span>白米{ctx.kg.hakumaiSource && `（${ctx.kg.hakumaiSource}）`}</span></div>
