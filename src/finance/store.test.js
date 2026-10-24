@@ -59,3 +59,26 @@ describe('単品とセット', () => {
     expect(fillKamoSales(fin, true).sales[0].riceGAtSale).toBe(140);
   });
 });
+
+describe('値段の変更', () => {
+  it('セットの米チャレの分は、売った日のおにぎりの値段で数える', async () => {
+    const { salesSummary } = await import('./calc');
+    const ks = [
+      { id: 'oni', name: 'おにぎり', price: 220, active: true },
+      { id: 'set', name: 'おにぎり豚汁セット', price: 800, active: true },
+    ];
+    let fin = applyKamoProducts(emptyFin(), ks);
+    fin = applySave(fin, 'products', { id: 'kamo:set', parts: '[{"id":"kamo:oni","qty":1}]' });
+    // 10/25 におにぎりを250円に値上げ
+    fin = applyKamoProducts(fin, [{ ...ks[0], price: 250 }, ks[1]], '2026-10-25');
+    expect(fin.priceHistory).toMatchObject([{ productId: 'kamo:oni', date: '2026-10-25', oldPrice: 220, newPrice: 250 }]);
+    const sales = [
+      { productId: 'kamo:set', date: '2026-10-24', qty: 1, amount: 800 },
+      { productId: 'kamo:set', date: '2026-10-25', qty: 1, amount: 800 },
+    ];
+    expect(salesSummary(sales, { products: fin.products, history: fin.priceHistory }).amount).toBe(470);
+    // 計算し直しても変わらない
+    fin = fillKamoSales(fin, true);
+    expect(salesSummary(sales, { products: fin.products, history: fin.priceHistory }).amount).toBe(470);
+  });
+});

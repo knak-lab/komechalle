@@ -30,6 +30,8 @@ const FIN_TABLES = {
   },
   settings: { sheet: 'fin_settings', key: 'key', cols: ['key', 'value'] },
   kamoProducts: { sheet: 'fin_kamo_products', key: 'id', cols: ['id', 'name', 'price', 'active', 'syncedAt'] },
+  // 商品の値段の変更。date より前の売上は oldPrice で数える（セットの米チャレの分を売った時の値段で出すため）
+  priceHistory: { sheet: 'fin_price_history', key: 'id', cols: ['id', 'productId', 'date', 'oldPrice', 'newPrice'] },
 };
 // 画面から直接保存できる表（カモの小屋の写しは取り込みだけが書く）
 const FIN_EDITABLE = ['harvest', 'costs', 'assets', 'products', 'sales', 'settings'];
@@ -58,6 +60,10 @@ const FIN_ACTIONS = {
     }
     const clean = {};
     allowed.forEach((c) => { if (c in row) clean[c] = limit_(row[c], 2000); });
+    if (req.table === 'products' && 'price' in clean) {
+      const old = readAll_(t.sheet, t.cols).find((x) => x.id === key);
+      if (old) finPriceChanged_(key, old.price, clean.price);
+    }
     if (findRow_(sh, key)) updateRow_(sh, t.cols, key, clean);
     else appendObj_(sh, t.cols, clean);
     // ご飯の量が入ったら、まだ空いている取り込み売上の米の量・変動費を埋める
@@ -285,6 +291,7 @@ function finSyncKamoProducts_(kamoProducts) {
       appendObj_(sh, P.cols, Object.assign({ id: 'kamo:' + kid, channel: 'store', kind: finGuessKind_(k.name), parts: '[]', materials: '[]', customerPaysShipping: 'false', kamoProductId: kid }, sync));
       created++;
     } else if (Object.keys(sync).some((c) => String(p[c]).toUpperCase() !== sync[c].toUpperCase())) {
+      finPriceChanged_(p.id, p.price, sync.price);
       updateRow_(sh, P.cols, p.id, sync);
     }
   });
@@ -328,6 +335,14 @@ function finFillKamoSales_(redo) {
   });
   if (n) range.setNumberFormat('@').setValues(values);
   return n;
+}
+
+// 値段が変わったら、今日から新しい値段として記録する（store.js の priceChange と同じ）
+function finPriceChanged_(productId, oldPrice, newPrice) {
+  if (String(oldPrice) === '' || String(oldPrice) === String(newPrice)) return;
+  const t = FIN_TABLES.priceHistory;
+  const today = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd');
+  appendObj_(sheet_(t.sheet, t.cols), t.cols, { id: productId + '@' + new Date().toISOString(), productId: productId, date: today, oldPrice: oldPrice, newPrice: newPrice });
 }
 
 /* ---------- 毎日の自動取り込み ---------- */

@@ -400,7 +400,7 @@ export function ProductsTab({ fin, ctx, api }) {
         : <button className="btn" onClick={() => setEdit({})}>＋ 商品を追加</button>}
       <div className="fin-since">
         <button className="btn small" onClick={api.recalc}>取り込んだ売上を、今の商品の設定で計算し直す</button>
-        <small>ご飯の量やセットの中身をあとから直したときに押します</small>
+        <small>ご飯の量・資材・セットの中身をあとから直したときに押します（値段の変更は売った日の値段のまま残るので、押さなくて大丈夫です）</small>
       </div>
     </>
   );

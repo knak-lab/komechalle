@@ -73,6 +73,7 @@ export function sampleFinance() {
     sales: [],
     settings: { cookRatio: 2.2, kamoLastSyncAt: '' },
     kamoProducts: [],
+    priceHistory: [],
   };
 }
 

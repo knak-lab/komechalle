@@ -90,9 +90,20 @@ export function hasRice(p, products = []) {
   return parts.length > 0 && parts.every((x) => hasRice(x.p));
 }
 
+// その日の値段。値段の変更（priceHistory）があれば、変更日より前は変更前の値段
+export function priceAt(p, date, history = []) {
+  let price = num(p.price) || 0;
+  if (!date) return price;
+  history
+    .filter((h) => h.productId === p.id)
+    .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id))
+    .forEach((h) => { if (date < h.date) price = num(h.oldPrice) || 0; });
+  return price;
+}
+
 // セットを1単位の計算用にほどく：お米・資材は中身の単品の合計＋セット自身の資材、
-// 米チャレの売上は中身の単品の値段の合計（セットの値段が上限）
-export function expandSet(p, products = [], cookRatio = DEFAULT_COOK_RATIO) {
+// 米チャレの売上は中身の単品の値段の合計（セットの値段が上限）。date があればその日の値段で
+export function expandSet(p, products = [], cookRatio = DEFAULT_COOK_RATIO, { date, history } = {}) {
   if (!isSet(p)) return { ...p, komePrice: num(p.price) || 0, onigiri: 1 };
   const parts = setParts(p, products);
   const materials = [
@@ -104,7 +115,7 @@ export function expandSet(p, products = [], cookRatio = DEFAULT_COOK_RATIO) {
     cookedG: '',
     riceRawG: parts.length ? sum(parts.map((x) => riceG(x.p, cookRatio) * x.qty)) : '',
     materials,
-    komePrice: Math.min(num(p.price) || 0, sum(parts.map((x) => (num(x.p.price) || 0) * x.qty))),
+    komePrice: Math.min(priceAt(p, date, history), sum(parts.map((x) => priceAt(x.p, date, history) * x.qty))),
     onigiri: sum(parts.map((x) => x.qty)),
   };
 }
@@ -164,12 +175,14 @@ export function yearOfDate(date, harvests = []) {
 }
 
 // 米チャレの売上：セットは「中身の単品の値段の合計 ÷ セットの値段」の割合だけ数える（値引きにも比例）
-export function komeAmount(s, products = []) {
+// 値段は売った日のもの（history は値段の変更の記録）
+export function komeAmount(s, products = [], history = []) {
   const amount = num(s.amount) || 0;
   const p = products.find((x) => x.id === s.productId);
   if (!isSet(p)) return amount;
-  const price = num(p.price) || 0;
-  return price > 0 ? amount * (expandSet(p, products).komePrice / price) : 0;
+  const at = { date: s.date, history };
+  const price = priceAt(p, s.date, history);
+  return price > 0 ? amount * (expandSet(p, products, DEFAULT_COOK_RATIO, at).komePrice / price) : 0;
 }
 
 // おにぎり（単品）ごとの販売数。セットの中身も数える → Map(単品id → 個数)
@@ -186,11 +199,11 @@ export function onigiriCounts(sales, products = []) {
   return m;
 }
 
-export const saleKeep = (s, products = []) => komeAmount(s, products) - (num(s.variableCostAtSale) || 0) * (num(s.qty) || 0);
+export const saleKeep = (s, products = [], history = []) => komeAmount(s, products, history) - (num(s.variableCostAtSale) || 0) * (num(s.qty) || 0);
 
-export function salesSummary(sales, { totalCost = 0, hakumaiKg = null, products = [] } = {}) {
-  const keep = sum(sales.map((s) => saleKeep(s, products)));
-  const amount = sum(sales.map((s) => komeAmount(s, products)));
+export function salesSummary(sales, { totalCost = 0, hakumaiKg = null, products = [], history = [] } = {}) {
+  const keep = sum(sales.map((s) => saleKeep(s, products, history)));
+  const amount = sum(sales.map((s) => komeAmount(s, products, history)));
   const riceUsedKg = sum(sales.map((s) => (num(s.qty) || 0) * (num(s.riceGAtSale) || 0))) / 1000;
   return {
     amount, keep, riceUsedKg,

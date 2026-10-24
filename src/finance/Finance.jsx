@@ -150,7 +150,7 @@ export default function FinanceDialog({ adminKey, nodes, onClose, toast }) {
 
 function SummaryTab({ fin, ctx, year, events }) {
   const sales = fin.sales.filter((s) => saleYear(s, fin.harvest) === year && s.productId);
-  const sum = salesSummary(sales, { totalCost: ctx.totalCost, hakumaiKg: ctx.kg.hakumaiKg, products: fin.products });
+  const sum = salesSummary(sales, { totalCost: ctx.totalCost, hakumaiKg: ctx.kg.hakumaiKg, products: fin.products, history: fin.priceHistory || [] });
   const recovered = Math.min(1, Math.max(0, sum.recovery || 0));
   const products = fin.products.filter((p) => bool(p.active));
   const counts = [...onigiriCounts(sales, fin.products).entries()]
@@ -161,8 +161,8 @@ function SummaryTab({ fin, ctx, year, events }) {
     const k = s.eventId || '';
     const g = byEvent.get(k) || { qty: 0, amount: 0, keep: 0 };
     g.qty += num(s.qty) || 0;
-    g.amount += komeAmount(s, fin.products);
-    g.keep += saleKeep(s, fin.products);
+    g.amount += komeAmount(s, fin.products, fin.priceHistory || []);
+    g.keep += saleKeep(s, fin.products, fin.priceHistory || []);
     byEvent.set(k, g);
   }
   const evRows = [...byEvent.entries()].map(([id, g]) => ({ id, ev: events.find((e) => e.id === id), ...g }))
@@ -348,7 +348,7 @@ function SalesTab({ fin, ctx, year, api, events }) {
                   <span className="d">{md(s.date)}</span>
                   <span className="t">{p ? p.name : <em>未紐づけ：{s.kamoProductId}</em>}<small>{[ev?.name, s.source === 'kamo' ? 'カモの小屋' : ''].filter(Boolean).join('・')}</small></span>
                   <span className="n">{(num(s.qty) || 0).toLocaleString()}個</span>
-                  <span className="n">{yen(komeAmount(s, fin.products))}{komeAmount(s, fin.products) !== (num(s.amount) || 0) && <small>セット {yen(num(s.amount))}</small>}</span>
+                  <span className="n">{yen(komeAmount(s, fin.products, fin.priceHistory || []))}{komeAmount(s, fin.products, fin.priceHistory || []) !== (num(s.amount) || 0) && <small>セット {yen(num(s.amount))}</small>}</span>
                 </button>
                 {isOpen && (
                   <div className="more">

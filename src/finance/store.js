@@ -5,14 +5,15 @@ export const CHANNELS = { event: 'イベント', store: '店頭', online: 'ネ�
 
 export const FIN_KEYS = { harvest: 'year', costs: 'id', assets: 'id', products: 'id', sales: 'id' };
 
-export const emptyFin = () => ({ harvest: [], costs: [], assets: [], products: [], sales: [], settings: {}, kamoProducts: [] });
+export const emptyFin = () => ({ harvest: [], costs: [], assets: [], products: [], sales: [], settings: {}, kamoProducts: [], priceHistory: [] });
 
 export function applySave(fin, table, row) {
   if (table === 'settings') return { ...fin, settings: { ...fin.settings, [row.key]: row.value } };
   const k = FIN_KEYS[table];
   const list = fin[table] || [];
   const i = list.findIndex((r) => String(r[k]) === String(row[k]));
-  const next = { ...fin, [table]: i < 0 ? [...list, row] : list.map((r, j) => (j === i ? { ...r, ...row } : r)) };
+  let next = { ...fin, [table]: i < 0 ? [...list, row] : list.map((r, j) => (j === i ? { ...r, ...row } : r)) };
+  if (table === 'products' && i >= 0 && 'price' in row) next = priceChange(next, list[i].id, list[i].price, row.price);
   return table === 'products' ? fillKamoSales(next) : next;
 }
 
@@ -36,12 +37,22 @@ export function applyLink(fin, kamoProductId, productId) {
 // 名前からセットかどうかを見当をつける（あとで画面で直せる）
 export const guessKind = (name) => (/セット|＆|&|ランチ|モーニング/.test(String(name)) ? 'set' : 'single');
 
+const todayJst = () => new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+
+// 値段が変わったら、今日から新しい値段として記録する（GAS の finPriceChanged_ と同じ）
+export function priceChange(fin, productId, oldPrice, newPrice, date = todayJst()) {
+  if (String(oldPrice ?? '') === '' || String(oldPrice) === String(newPrice)) return fin;
+  const h = { id: `${productId}@${new Date().toISOString()}`, productId, date, oldPrice, newPrice };
+  return { ...fin, priceHistory: [...(fin.priceHistory || []), h] };
+}
+
 // カモの小屋の商品ごとに米チャレの商品を1つ作る。名前・値段・販売中はカモの小屋に合わせる
-export function applyKamoProducts(fin, kamoProducts) {
+export function applyKamoProducts(fin, kamoProducts, date) {
   let products = fin.products;
   kamoProducts.forEach((k) => {
     const sync = { name: k.name, price: k.price, active: k.active !== false };
     const i = products.findIndex((p) => p.kamoProductId === k.id);
+    if (i >= 0) fin = priceChange(fin, products[i].id, products[i].price, k.price, date);
     products = i >= 0
       ? products.map((p, j) => (j === i ? { ...p, ...sync, kind: p.kind || guessKind(k.name) } : p))
       : [...products, {
